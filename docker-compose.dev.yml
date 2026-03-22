@@ -1,0 +1,22 @@
+services:
+  website:
+    build:
+      context: ./src/website
+    network:
+      - sandtris-network
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+  server:
+    build:
+      context: ./src/backend/SandtrisServer
+    network:
+      - sandtris-network
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+
+networks:
+  sandtris-network:

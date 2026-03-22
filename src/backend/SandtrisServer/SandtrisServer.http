@@ -1,0 +1,6 @@
+@baseAddress = http://localhost:5015
+
+GET {{SandtrisServer_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
