@@ -4,6 +4,22 @@
       <p class="queue-card__eyebrow">Multiplayer</p>
       <h2 class="queue-card__title">Match Queue</h2>
       <p class="queue-card__text">Jump into a live game or leave the queue at any time.</p>
+
+      <!-- Queue Status Display -->
+      <div v-if="connectionState === 'connected'" class="queue-status">
+        <span class="queue-status__icon">👥</span>
+        <span class="queue-status__text">
+          {{ queueSize }} {{ queueSize === 1 ? 'player' : 'players' }} in queue
+        </span>
+      </div>
+      <div v-else-if="connectionState === 'connecting'" class="queue-status queue-status--connecting">
+        <span class="queue-status__icon">🔄</span>
+        <span class="queue-status__text">Connecting...</span>
+      </div>
+      <div v-else class="queue-status queue-status--offline">
+        <span class="queue-status__icon">⚠️</span>
+        <span class="queue-status__text">Offline</span>
+      </div>
     </div>
 
     <div class="queue-card__actions">
@@ -18,12 +34,18 @@
 </template>
 
 <script setup lang="ts">
+import type { ConnectionState } from '../services/websocket/types'
+
 withDefaults(
   defineProps<{
     inQueue?: boolean
+    queueSize?: number
+    connectionState?: ConnectionState
   }>(),
   {
     inQueue: false,
+    queueSize: 0,
+    connectionState: 'disconnected',
   },
 )
 
@@ -76,6 +98,33 @@ const emit = defineEmits<{
 .queue-card__text {
   margin: 0;
   opacity: 0.86;
+}
+
+.queue-status {
+  margin-top: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 196, 162, 0.12);
+  border: 1px solid rgba(0, 196, 162, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.queue-status__icon {
+  font-size: 1.2rem;
+}
+
+.queue-status--connecting {
+  background: rgba(255, 204, 0, 0.12);
+  border-color: rgba(255, 204, 0, 0.2);
+}
+
+.queue-status--offline {
+  background: rgba(255, 74, 74, 0.12);
+  border-color: rgba(255, 74, 74, 0.2);
 }
 
 .queue-card__actions {

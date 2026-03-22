@@ -8,7 +8,8 @@ public static class GameWebSocketEndpoint
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
     public static IEndpointRouteBuilder MapGameEndpoints(this IEndpointRouteBuilder app)
