@@ -6,18 +6,18 @@
       <p class="queue-card__text">Jump into a live game or leave the queue at any time.</p>
 
       <!-- Queue Status Display -->
-      <div v-if="connectionState === 'connected'" class="queue-status">
-        <span class="queue-status__icon">👥</span>
+      <div v-if="connectionState === 'connected'" class="queue-status queue-status--connected">
+        <span class="queue-status__dot" aria-hidden="true"></span>
         <span class="queue-status__text">
           {{ queueSize }} {{ queueSize === 1 ? 'player' : 'players' }} in queue
         </span>
       </div>
       <div v-else-if="connectionState === 'connecting'" class="queue-status queue-status--connecting">
-        <span class="queue-status__icon">🔄</span>
+        <span class="queue-status__dot" aria-hidden="true"></span>
         <span class="queue-status__text">Connecting...</span>
       </div>
       <div v-else class="queue-status queue-status--offline">
-        <span class="queue-status__icon">⚠️</span>
+        <span class="queue-status__dot" aria-hidden="true"></span>
         <span class="queue-status__text">Offline</span>
       </div>
     </div>
@@ -57,24 +57,22 @@ const emit = defineEmits<{
 
 <style scoped>
 .queue-card {
-  --ink: #101727;
-  --paper: #fffef7;
-  --line: #e8d9b8;
-  --join-a: #00c4a2;
-  --join-b: #0f8f7c;
-  --leave-a: #ff8a5b;
-  --leave-b: #dd4a30;
+  --ink: #1f2937;
+  --muted: #6b7280;
+  --paper: #ffffff;
+  --surface: #f8fafc;
+  --line: #e5e7eb;
+  --line-strong: #cbd5e1;
+  --join-bg: #111827;
+  --leave-bg: #374151;
   width: min(100%, 38rem);
   margin-inline: auto;
   border: 1px solid var(--line);
-  border-radius: 1rem;
+  border-radius: 0.875rem;
   padding: 1.25rem;
-  background:
-    radial-gradient(circle at 8% 8%, #ffeec4 0%, transparent 30%),
-    radial-gradient(circle at 95% 90%, #ffd8c7 0%, transparent 33%),
-    var(--paper);
+  background: linear-gradient(180deg, var(--paper) 0%, var(--surface) 100%);
   color: var(--ink);
-  box-shadow: 0 16px 28px rgb(16 23 39 / 0.12);
+  box-shadow: 0 8px 20px rgb(15 23 42 / 0.08);
 }
 
 .queue-card__intro {
@@ -86,7 +84,7 @@ const emit = defineEmits<{
   font-size: 0.72rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  opacity: 0.72;
+  color: var(--muted);
 }
 
 .queue-card__title {
@@ -97,34 +95,51 @@ const emit = defineEmits<{
 
 .queue-card__text {
   margin: 0;
-  opacity: 0.86;
+  color: var(--muted);
 }
 
 .queue-status {
   margin-top: 0.75rem;
-  padding: 0.6rem 1rem;
+  padding: 0.58rem 0.8rem;
   border-radius: 0.5rem;
-  background: rgba(0, 196, 162, 0.12);
-  border: 1px solid rgba(0, 196, 162, 0.2);
+  background: #ffffff;
+  border: 1px solid var(--line);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 
-.queue-status__icon {
-  font-size: 1.2rem;
+.queue-status__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.queue-status--connected {
+  border-color: #d1d5db;
+}
+
+.queue-status--connected .queue-status__dot {
+  background: #10b981;
 }
 
 .queue-status--connecting {
-  background: rgba(255, 204, 0, 0.12);
-  border-color: rgba(255, 204, 0, 0.2);
+  border-color: #d1d5db;
+}
+
+.queue-status--connecting .queue-status__dot {
+  background: #f59e0b;
 }
 
 .queue-status--offline {
-  background: rgba(255, 74, 74, 0.12);
-  border-color: rgba(255, 74, 74, 0.2);
+  border-color: #d1d5db;
+}
+
+.queue-status--offline .queue-status__dot {
+  background: #ef4444;
 }
 
 .queue-card__actions {
@@ -134,15 +149,15 @@ const emit = defineEmits<{
 }
 
 .queue-button {
-  border: none;
+  border: 1px solid transparent;
   border-radius: 0.75rem;
   padding: 0.78rem 0.95rem;
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.01em;
   color: #ffffff;
   cursor: pointer;
-  transition: transform 0.14s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  transition: transform 0.14s ease, box-shadow 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
 }
 
 .queue-button:disabled {
@@ -161,13 +176,21 @@ const emit = defineEmits<{
 }
 
 .queue-button--join {
-  background: linear-gradient(135deg, var(--join-a), var(--join-b));
-  box-shadow: 0 10px 18px rgb(0 160 132 / 0.28);
+  background: var(--join-bg);
+  box-shadow: 0 4px 12px rgb(17 24 39 / 0.2);
 }
 
 .queue-button--leave {
-  background: linear-gradient(135deg, var(--leave-a), var(--leave-b));
-  box-shadow: 0 10px 18px rgb(221 74 48 / 0.28);
+  background: var(--leave-bg);
+  box-shadow: 0 4px 12px rgb(55 65 81 / 0.16);
+}
+
+.queue-button--join:not(:disabled):hover {
+  background: #0f172a;
+}
+
+.queue-button--leave:not(:disabled):hover {
+  background: #1f2937;
 }
 
 @media (max-width: 460px) {
