@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import MatchQueue from './components/MatchQueue.vue'
-import { JoinMatchQueue, LeaveMatchQueue } from './services/SandtrisService'
+import { JoinMatchQueue, LeaveMatchQueue, GetQueueSize } from './services/SandtrisService'
 import { useWebSocket } from './services/websocket/useWebSocket'
 
 const inQueue = ref(false)
@@ -38,6 +38,13 @@ const handleJoinQueue = async () => {
     const res = await JoinMatchQueue(playerId)
     if (!res.ok) {
       throw new Error(`Join failed with status ${res.status}`)
+    }
+
+    // Parse response to get current queue size
+    const data = await res.json()
+    if (data.queueSize !== undefined) {
+      queueSize.value = data.queueSize
+      console.log('Joined queue - Current size:', data.queueSize)
     }
 
     console.log('Joined match queue successfully')
@@ -84,6 +91,14 @@ onMounted(async () => {
   try {
     await connect()
     subscribeLobby()
+
+    // Fetch initial queue size after connection is established
+    const initialSize = await GetQueueSize()
+    if (initialSize >= 0) {
+      queueSize.value = initialSize
+      console.log('Initial queue size loaded:', initialSize)
+    }
+
     console.log('Connected to WebSocket and subscribed to lobby')
   } catch (error) {
     console.error('Failed to connect to WebSocket:', error)

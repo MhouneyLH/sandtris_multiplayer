@@ -4,6 +4,7 @@ public static class MatchQueueEndpoints
 {
     public static void MapMatchQueueEndpoints(this WebApplication app)
     {
+        app.MapGet("/match-queue/size", GetQueueSize.HandleAsync);
         app.MapPost("/match-queue/join", JoinMatchQueue.HandleAsync);
         app.MapPost("/match-queue/leave", LeaveMatchQueue.HandleAsync);
     }
