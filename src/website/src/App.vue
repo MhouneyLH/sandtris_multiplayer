@@ -22,6 +22,7 @@ const handleJoinQueue = async () => {
     return
   }
 
+  console.log('Joined match queue successfully')
   inQueue.value = true
 }
 
@@ -32,6 +33,7 @@ const handleLeaveQueue = async () => {
     return
   }
 
+  console.log('Left match queue successfully')
   inQueue.value = false
 }
 </script>
