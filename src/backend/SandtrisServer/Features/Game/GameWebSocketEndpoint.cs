@@ -29,16 +29,26 @@ public static class GameWebSocketEndpoint
 
         using var socket = await context.WebSockets.AcceptWebSocketAsync();
         var logger = loggerFactory.CreateLogger("GameWebSocketEndpoint");
+        var applicationLifetime = context.RequestServices.GetRequiredService<IHostApplicationLifetime>();
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            context.RequestAborted,
+            applicationLifetime.ApplicationStopping);
+        var shutdownToken = linkedCts.Token;
 
         var connectionId = eventBus.RegisterConnection(socket);
 
         try
         {
-            await ReceiveLoopAsync(connectionId, socket, eventBus, gameService, logger, cancellationToken);
+            await ReceiveLoopAsync(connectionId, socket, eventBus, gameService, logger, shutdownToken);
+        }
+        catch (OperationCanceledException) when (shutdownToken.IsCancellationRequested)
+        {
+            logger.LogDebug("Connection {ConnectionId} receive loop cancelled due to shutdown/disconnect.", connectionId);
         }
         finally
         {
-            await eventBus.UnregisterConnectionAsync(connectionId, cancellationToken);
+            await eventBus.UnregisterConnectionAsync(connectionId, CancellationToken.None);
         }
     }
 

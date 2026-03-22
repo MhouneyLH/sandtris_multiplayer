@@ -12,6 +12,9 @@ builder.Services.AddSingleton<MatchQueueService>();
 
 var app = builder.Build();
 
+var eventBus = app.Services.GetRequiredService<WebSocketEventBus>();
+app.Lifetime.ApplicationStopping.Register(eventBus.AbortAllConnections);
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();

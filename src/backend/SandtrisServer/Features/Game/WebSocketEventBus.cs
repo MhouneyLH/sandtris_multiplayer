@@ -46,6 +46,10 @@ public sealed class WebSocketEventBus(ILogger<WebSocketEventBus> logger)
             {
                 await state.Socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Connection closed", cancellationToken);
             }
+            catch (OperationCanceledException)
+            {
+                state.Socket.Abort();
+            }
             catch (WebSocketException)
             {
                 // Ignore; socket may already be closed by peer.
@@ -56,6 +60,24 @@ public sealed class WebSocketEventBus(ILogger<WebSocketEventBus> logger)
         state.Socket.Dispose();
 
         _logger.LogInformation("WebSocket connection {ConnectionId} unregistered.", connectionId);
+    }
+
+    public void AbortAllConnections()
+    {
+        foreach (var connectionId in _connections.Keys)
+        {
+            if (_connections.TryRemove(connectionId, out var state))
+            {
+                state.Socket.Abort();
+                state.Socket.Dispose();
+                state.SendLock.Dispose();
+            }
+        }
+
+        _connectionMatches.Clear();
+        _matchSubscribers.Clear();
+
+        _logger.LogInformation("All WebSocket connections were aborted for shutdown.");
     }
 
     public void SubscribeToMatch(string connectionId, string matchId)
