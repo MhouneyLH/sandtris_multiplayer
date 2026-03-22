@@ -5,7 +5,7 @@ namespace SandtrisServer.Features.MatchQueue;
 
 public static class JoinMatchQueue
 {
-    public sealed record Request([property: JsonPropertyName("playerId"), Required] Guid PlayerId);
+    public sealed record Request([property: JsonPropertyName("playerId"), Required] string PlayerId);
 
     public sealed record Response([property: JsonPropertyName("queueSize")] int QueueSize);
 

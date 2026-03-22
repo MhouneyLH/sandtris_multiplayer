@@ -4,10 +4,10 @@ namespace SandtrisServer.Features.MatchQueue;
 
 public sealed class MatchQueueService(ILogger<MatchQueueService> logger)
 {
-    private readonly ConcurrentDictionary<Guid, DateTime> _queue = new();
+    private readonly ConcurrentDictionary<string, DateTime> _queue = new();
     private readonly ILogger<MatchQueueService> _logger = logger;
 
-    public async Task JoinQueueAsync(Guid playerId)
+    public async Task JoinQueueAsync(string playerId)
     {
         if (IsQueueLimitReached())
         {
@@ -20,7 +20,7 @@ public sealed class MatchQueueService(ILogger<MatchQueueService> logger)
         _queue[playerId] = DateTime.UtcNow;
     }
 
-    public async Task LeaveQueueAsync(Guid playerId)
+    public async Task LeaveQueueAsync(string playerId)
     {
         if (!_queue.TryRemove(playerId, out _))
         {
