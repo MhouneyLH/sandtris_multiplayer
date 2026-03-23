@@ -12,7 +12,7 @@
           <h3>You</h3>
           <div class="game-panel__stats">
             <span>Score: <strong>{{ yourScore }}</strong></span>
-            <span>Lines: <strong>{{ yourLines }}</strong></span>
+            <span>Particles: <strong>{{ yourLines }}</strong></span>
           </div>
         </div>
         <TetrisGame ref="yourGame" :playerId="playerId" :isYours="true" @scoreUpdate="handleYourScoreUpdate" />
@@ -24,7 +24,7 @@
           <h3>Opponent</h3>
           <div class="game-panel__stats">
             <span>Score: <strong>{{ opponentScore }}</strong></span>
-            <span>Lines: <strong>{{ opponentLines }}</strong></span>
+            <span>Particles: <strong>{{ opponentLines }}</strong></span>
           </div>
         </div>
         <TetrisGame ref="opponentGame" :playerId="opponentId" :isYours="false"
