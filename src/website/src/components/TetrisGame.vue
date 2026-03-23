@@ -46,6 +46,10 @@ let linesCleared = 0
 let dropTimer = 0
 let dropInterval = 120 // Drop every 120 frames (2 seconds at 60fps)
 
+// Debug mode: same color spawning
+let sameColorMode = false
+let lastPieceColor = '#ff0000' // Default red
+
 // Key state tracking for simultaneous key presses
 const keyState = {
   left: false,
@@ -93,6 +97,14 @@ const spawnNewPiece = () => {
   currentPiece = getRandomPiece()
   currentPiece.x = Math.floor(VISUAL_WIDTH / 2) - 1
   currentPiece.y = 0
+
+  // In same color mode, override the piece color
+  if (sameColorMode) {
+    currentPiece.color = lastPieceColor
+  } else {
+    // Store the color for potential same color mode
+    lastPieceColor = currentPiece.color
+  }
 }
 
 const setupControls = () => {
@@ -122,6 +134,52 @@ const setupControls = () => {
         break
       case ' ':
         keyState.space = true
+        handled = true
+        break
+      case 't':  // Test horizontal line
+      case 'T':
+        console.log('Creating test horizontal line...')
+        sandSimulation.createTestLine(Math.floor(GRID_HEIGHT * 0.8), '#ff0000')
+        handled = true
+        break
+      case 'y':  // Test diagonal line
+      case 'Y':
+        console.log('Creating test diagonal line...')
+        sandSimulation.createTestDiagonal('#00ff00')
+        handled = true
+        break
+      case 'r':  // Test zigzag line
+      case 'R':
+        console.log('Creating test zigzag line...')
+        sandSimulation.createTestZigzag('#0000ff')
+        handled = true
+        break
+      case 'u':  // Manually trigger completion check
+      case 'U':
+        console.log('Manually checking for completions...')
+        const testCompletions = sandSimulation.debugCheckCompletedLines() // Use verbose debug version
+        console.log('Manual check found', testCompletions.length, 'completions')
+        if (testCompletions.length > 0) {
+          sandSimulation.clearConnectedGroups()
+        }
+        handled = true
+        break
+      case 'i':  // Debug print grid
+      case 'I':
+        console.log('Printing grid state...')
+        sandSimulation.debugPrintGrid()
+        handled = true
+        break
+      case 'c':  // Clear all particles
+      case 'C':
+        console.log('Clearing all particles...')
+        sandSimulation.clearAll()
+        handled = true
+        break
+      case 's':  // Toggle same color mode
+      case 'S':
+        sameColorMode = !sameColorMode
+        console.log(`Same color mode: ${sameColorMode ? 'ON' : 'OFF'}${sameColorMode ? ` (color: ${lastPieceColor})` : ''}`)
         handled = true
         break
     }
@@ -247,22 +305,28 @@ const lockPiece = () => {
         const gridY = currentPiece.y + y
 
         if (gridY >= 0) {
-          // Very minimal color variation for cleaner look
-          const colorVariation = Math.random() * 0.02 - 0.01 // ±1% brightness (much less variation)
-          const variedColor = varyColor(currentPiece.color, colorVariation)
+          // In same color mode, don't vary the color to ensure perfect matching
+          const finalColor = sameColorMode ? currentPiece.color : (() => {
+            // Very minimal color variation for cleaner look
+            const colorVariation = Math.random() * 0.02 - 0.01 // ±1% brightness (much less variation)
+            return varyColor(currentPiece.color, colorVariation)
+          })()
 
           // Fill the entire tetris block area with sand particles
-          sandSimulation.fillTetrisBlock(gridX, gridY, variedColor, CELL_SIZE)
+          sandSimulation.fillTetrisBlock(gridX, gridY, finalColor, CELL_SIZE)
         }
       }
     }
   }
 
   // Check for completed lines
+  console.log('Checking for completions after piece lock...')
   const completedLines = sandSimulation.checkCompletedLines()
+  console.log('TetrisGame: Found', completedLines.length, 'completed groups')
   if (completedLines.length > 0) {
     // Count particles that will be cleared for scoring
     const particlesCleared = sandSimulation.countParticlesInConnectedGroups()
+    console.log('TetrisGame: Will clear', particlesCleared, 'particles')
 
     linesCleared += particlesCleared // Now represents particles cleared, not lines
     score += particlesCleared * 10 + (particlesCleared > 10 ? Math.floor(particlesCleared / 10) * 50 : 0) // Bonus for larger groups
