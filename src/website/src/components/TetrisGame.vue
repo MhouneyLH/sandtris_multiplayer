@@ -76,7 +76,15 @@ onMounted(() => {
   if (!ctx) return
 
   // Initialize sand simulation (using tetris grid dimensions)
-  sandSimulation = new SandSimulation(GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, SAND_UPDATE_SPEED)
+  const onCompletion = (particlesCleared: number) => {
+    linesCleared += particlesCleared // Now represents particles cleared, not lines
+    score += particlesCleared * 10 + (particlesCleared > 10 ? Math.floor(particlesCleared / 10) * 50 : 0) // Bonus for larger groups
+
+    // Emit score update
+    emit('scoreUpdate', { score, lines: linesCleared })
+  }
+
+  sandSimulation = new SandSimulation(GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, SAND_UPDATE_SPEED, onCompletion)
 
   // Example: To change sand speed during gameplay:
   // sandSimulation.setSandSpeed(1)  // Fastest (every frame)
@@ -357,23 +365,7 @@ const lockPiece = () => {
     }
   }
 
-  // Check for completed lines immediately when piece locks
-  console.log(`🎯 Piece locked! Checking for completions...`)
-  const completedLines = sandSimulation.checkCompletedLines()
-  if (completedLines.length > 0) {
-    // Count particles that will be cleared for scoring
-    const particlesCleared = sandSimulation.countParticlesInConnectedGroups()
-
-    linesCleared += particlesCleared // Now represents particles cleared, not lines
-    score += particlesCleared * 10 + (particlesCleared > 10 ? Math.floor(particlesCleared / 10) * 50 : 0) // Bonus for larger groups
-
-    sandSimulation.clearConnectedGroups()
-
-    // Emit score update
-    emit('scoreUpdate', { score, lines: linesCleared })
-  } else {
-    console.log(`🎯 No completions found.`)
-  }
+  console.log(`🎯 Piece locked! Sand particles added.`)
 
   // Spawn new piece
   spawnNewPiece()

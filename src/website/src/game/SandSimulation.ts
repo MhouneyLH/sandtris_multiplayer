@@ -12,8 +12,11 @@ export class SandSimulation {
   private updateInterval: number // How many frames between sand updates (lower = faster)
   private clearingAnimation: Set<string> = new Set() // Track particles being cleared with white animation
   private clearingAnimationFrames = 0
+  private completionCallback?: (particlesCleared: number) => void
+  private lastCompletionCheck = 0
+  private completionCheckInterval = 10 // Check for completions every 10 frames
 
-  constructor(tetrisWidth: number, tetrisHeight: number, tetrisCellSize: number = 30, sandUpdateSpeed: number = 1) {
+  constructor(tetrisWidth: number, tetrisHeight: number, tetrisCellSize: number = 30, sandUpdateSpeed: number = 1, onCompletion?: (particlesCleared: number) => void) {
     // Create a fine grid where each sand particle is 4x4 pixels
     this.particleSize = 4
     this.width = Math.floor((tetrisWidth * tetrisCellSize) / this.particleSize)
@@ -21,6 +24,9 @@ export class SandSimulation {
 
     // Set sand update frequency (1 = every frame, 2 = every 2 frames, etc.)
     this.updateInterval = sandUpdateSpeed
+
+    // Store completion callback
+    this.completionCallback = onCompletion
 
     // Initialize 2D array with null values
     this.particles = Array.from({ length: this.height }, () =>
@@ -125,6 +131,31 @@ export class SandSimulation {
         }
         // If particle is at the very bottom row, it should never try to move
         // The condition y < this.height - 1 already handles this
+      }
+    }
+
+    // Check for completions periodically (not every frame for performance)
+    this.lastCompletionCheck++
+    if (this.lastCompletionCheck >= this.completionCheckInterval) {
+      this.lastCompletionCheck = 0
+      this.checkForCompletionsAndNotify()
+    }
+  }
+
+  private checkForCompletionsAndNotify(): void {
+    const completedLines = this.checkCompletedLines()
+    if (completedLines.length > 0) {
+      // Count particles that will be cleared
+      const particlesCleared = this.countParticlesInConnectedGroups()
+
+      console.log(`🎯 Auto-detected completion: ${particlesCleared} particles will be cleared`)
+
+      // Clear the groups immediately
+      this.clearConnectedGroups()
+
+      // Notify the game through callback
+      if (this.completionCallback) {
+        this.completionCallback(particlesCleared)
       }
     }
   }
