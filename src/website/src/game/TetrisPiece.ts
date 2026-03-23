@@ -13,7 +13,12 @@ export class TetrisPiece {
 
   // Rotate the piece 90 degrees clockwise
   rotate(): void {
-    const rotated = this.shape[0].map((_, i) => this.shape.map((row) => row[i]).reverse())
+    if (this.shape.length === 0) return
+
+    const width = this.shape[0]?.length ?? 0
+    const rotated: number[][] = Array.from({ length: width }, (_, i) =>
+      this.shape.map((row) => row[i] ?? 0).reverse(),
+    )
     this.shape = rotated
   }
 }
@@ -71,11 +76,11 @@ export const TETRIS_PIECES = {
 // Get a random piece
 export function getRandomPiece(): TetrisPiece {
   const pieceTypes = Object.keys(TETRIS_PIECES) as (keyof typeof TETRIS_PIECES)[]
-  const randomType = pieceTypes[Math.floor(Math.random() * pieceTypes.length)]
+  const randomType = pieceTypes[Math.floor(Math.random() * pieceTypes.length)] ?? 'I'
   const pieceData = TETRIS_PIECES[randomType]
 
   return new TetrisPiece(
-    pieceData.shape.map((row) => [...row]), // Deep clone the shape
+    pieceData.shape.map((row: number[]) => [...row]), // Deep clone the shape
     pieceData.color,
   )
 }

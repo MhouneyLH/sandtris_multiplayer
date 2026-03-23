@@ -6,16 +6,33 @@ interface SandParticle {
 
 export class SandSimulation {
   private particles: (SandParticle | null)[][] = [] // 2D grid of tiny particles
-  private width: number
-  private height: number
-  private particleSize: number // Size of each sand grain in pixels (2x2 or 4x4)
+  private readonly width: number
+  private readonly height: number
+  private readonly particleSize: number = 5; // Size of each sand grain in pixels (2x2 or 4x4)
   private frameCounter: number = 0
   private updateInterval: number // How many frames between sand updates (lower = faster)
-  private clearingAnimation: Set<string> = new Set() // Track particles being cleared with white animation
+  private readonly clearingAnimation: Set<string> = new Set() // Track particles being cleared with white animation
   private clearingAnimationFrames = 0
-  private completionCallback?: (particlesCleared: number) => void
+  private readonly completionCallback?: (particlesCleared: number) => void
   private lastCompletionCheck = 0
-  private completionCheckInterval = 10 // Check for completions every 10 frames
+  private readonly completionCheckInterval = 10 // Check for completions every 10 frames
+
+  private isInBounds(x: number, y: number): boolean {
+    return x >= 0 && x < this.width && y >= 0 && y < this.height
+  }
+
+  private getParticle(x: number, y: number): SandParticle | null {
+    if (!this.isInBounds(x, y)) return null
+    const row = this.particles[y]
+    return row?.[x] ?? null
+  }
+
+  private setParticle(x: number, y: number, particle: SandParticle | null): void {
+    if (!this.isInBounds(x, y)) return
+    const row = this.particles[y]
+    if (!row) return
+    row[x] = particle
+  }
 
   constructor(
     tetrisWidth: number,
@@ -24,8 +41,8 @@ export class SandSimulation {
     sandUpdateSpeed: number = 1,
     onCompletion?: (particlesCleared: number) => void,
   ) {
-    // Create a fine grid where each sand particle is 4x4 pixels
-    this.particleSize = 4
+    // Use a particle size that divides the 30px tetris cell cleanly.
+    // This avoids cumulative rounding gaps near borders.
     this.width = Math.floor((tetrisWidth * tetrisCellSize) / this.particleSize)
     this.height = Math.floor((tetrisHeight * tetrisCellSize) / this.particleSize)
 
@@ -72,7 +89,7 @@ export class SandSimulation {
     for (let y = sandY; y < sandY + sandHeight && y < this.height; y++) {
       for (let x = sandX; x < sandX + sandWidth && x < this.width; x++) {
         if (x >= 0 && y >= 0) {
-          this.particles[y][x] = { color: visualColor, type, groupId }
+          this.setParticle(x, y, { color: visualColor, type, groupId })
         }
       }
     }
@@ -81,7 +98,7 @@ export class SandSimulation {
   hasGroupParticles(groupId: number): boolean {
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
-        const particle = this.particles[y][x]
+        const particle = this.getParticle(x, y)
         if (particle?.groupId === groupId) {
           return true
         }
@@ -102,23 +119,22 @@ export class SandSimulation {
 
     if (dx === 0 && dy === 0) return true
 
+    const positions: { x: number; y: number }[] = []
     const groupKeys = new Set<string>()
-    let hasAnyParticle = false
 
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
-        const particle = this.particles[y][x]
+        const particle = this.getParticle(x, y)
         if (particle?.groupId === groupId) {
+          positions.push({ x, y })
           groupKeys.add(`${x},${y}`)
-          hasAnyParticle = true
         }
       }
     }
 
-    if (!hasAnyParticle) return false
+    if (positions.length === 0) return false
 
-    for (const key of groupKeys) {
-      const [x, y] = key.split(',').map(Number)
+    for (const { x, y } of positions) {
       const targetX = x + dx
       const targetY = y + dy
 
@@ -126,7 +142,7 @@ export class SandSimulation {
         return false
       }
 
-      const targetParticle = this.particles[targetY][targetX]
+      const targetParticle = this.getParticle(targetX, targetY)
       if (targetParticle && !groupKeys.has(`${targetX},${targetY}`)) {
         return false
       }
@@ -152,14 +168,12 @@ export class SandSimulation {
     if (dx === 0 && dy === 0) return true
 
     const positions: { x: number; y: number; particle: SandParticle }[] = []
-    const groupKeys = new Set<string>()
 
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
-        const particle = this.particles[y][x]
+        const particle = this.getParticle(x, y)
         if (particle?.groupId === groupId) {
           positions.push({ x, y, particle })
-          groupKeys.add(`${x},${y}`)
         }
       }
     }
@@ -176,11 +190,11 @@ export class SandSimulation {
     })
 
     for (const { x, y } of ordered) {
-      this.particles[y][x] = null
+      this.setParticle(x, y, null)
     }
 
     for (const { x, y, particle } of ordered) {
-      this.particles[y + dy][x + dx] = particle
+      this.setParticle(x + dx, y + dy, particle)
     }
 
     return true
@@ -189,7 +203,7 @@ export class SandSimulation {
   releaseGroup(groupId: number): void {
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
-        const particle = this.particles[y][x]
+        const particle = this.getParticle(x, y)
         if (particle?.groupId === groupId) {
           delete particle.groupId
         }
@@ -203,7 +217,7 @@ export class SandSimulation {
 
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
-        const particle = this.particles[y][x]
+        const particle = this.getParticle(x, y)
         if (particle?.groupId === groupId) {
           positions.push({ x, y, particle })
           groupKeys.add(`${x},${y}`)
@@ -239,18 +253,18 @@ export class SandSimulation {
       if (targetX < 0 || targetX >= this.width || targetY < 0 || targetY >= this.height) {
         return false
       }
-      const targetParticle = this.particles[targetY][targetX]
+      const targetParticle = this.getParticle(targetX, targetY)
       if (targetParticle && !groupKeys.has(`${targetX},${targetY}`)) {
         return false
       }
     }
 
     for (const { x, y } of positions) {
-      this.particles[y][x] = null
+      this.setParticle(x, y, null)
     }
 
     for (const { targetX, targetY, particle } of rotated) {
-      this.particles[targetY][targetX] = particle
+      this.setParticle(targetX, targetY, particle)
     }
 
     return true
@@ -269,7 +283,7 @@ export class SandSimulation {
     // Check if any particle exists in this tetris block area
     for (let y = sandY; y < sandY + sandHeight && y < this.height; y++) {
       for (let x = sandX; x < sandX + sandWidth && x < this.width; x++) {
-        if (x >= 0 && y >= 0 && this.particles[y][x] !== null) {
+        if (x >= 0 && y >= 0 && this.getParticle(x, y) !== null) {
           return true
         }
       }
@@ -291,8 +305,11 @@ export class SandSimulation {
       if (this.clearingAnimationFrames >= animationDuration) {
         // Animation complete - actually clear the particles
         for (const particleKey of this.clearingAnimation) {
-          const [x, y] = particleKey.split(',').map(Number)
-          this.particles[y][x] = null
+          const [xStr, yStr] = particleKey.split(',')
+          const x = Number(xStr)
+          const y = Number(yStr)
+          if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+          this.setParticle(x, y, null)
         }
         this.clearingAnimation.clear()
         this.clearingAnimationFrames = 0
@@ -306,28 +323,22 @@ export class SandSimulation {
     // Simple sand physics exactly like the CodePen - process from bottom-right to top-left
     for (let y = this.height - 2; y >= 0; y--) {
       for (let x = this.width - 1; x >= 0; x--) {
-        const particle = this.particles[y][x]
+        const particle = this.getParticle(x, y)
         if (!particle) continue
 
-        // Check if particle can move (not at bottom and has space to move)
-        let moved = false
-
         // CodePen physics: try down, then down-right, then down-left
-        if (y < this.height - 1 && !this.particles[y + 1][x]) {
+        if (y < this.height - 1 && !this.getParticle(x, y + 1)) {
           // Fall straight down
-          this.particles[y][x] = null
-          this.particles[y + 1][x] = particle
-          moved = true
-        } else if (y < this.height - 1 && x < this.width - 1 && !this.particles[y + 1][x + 1]) {
+          this.setParticle(x, y, null)
+          this.setParticle(x, y + 1, particle)
+        } else if (y < this.height - 1 && x < this.width - 1 && !this.getParticle(x + 1, y + 1)) {
           // Fall down-right
-          this.particles[y][x] = null
-          this.particles[y + 1][x + 1] = particle
-          moved = true
-        } else if (y < this.height - 1 && x > 0 && !this.particles[y + 1][x - 1]) {
+          this.setParticle(x, y, null)
+          this.setParticle(x + 1, y + 1, particle)
+        } else if (y < this.height - 1 && x > 0 && !this.getParticle(x - 1, y + 1)) {
           // Fall down-left
-          this.particles[y][x] = null
-          this.particles[y + 1][x - 1] = particle
-          moved = true
+          this.setParticle(x, y, null)
+          this.setParticle(x - 1, y + 1, particle)
         }
         // If particle is at the very bottom row, it should never try to move
         // The condition y < this.height - 1 already handles this
@@ -369,8 +380,9 @@ export class SandSimulation {
 
     // Check each particle on the left border
     for (let y = 0; y < this.height; y++) {
-      const leftParticle = this.particles[y][0]
-      if (!leftParticle || visited[y][0]) continue
+      const leftParticle = this.getParticle(0, y)
+      const visitedRow = visited[y]
+      if (!leftParticle || !visitedRow || visitedRow[0]) continue
 
       console.log(`🔍 Starting flood fill from (0,${y}) with type: '${leftParticle.type}'`)
 
@@ -410,11 +422,16 @@ export class SandSimulation {
       const { x, y } = stack.pop()!
 
       // Check bounds and if already visited
-      if (x < 0 || x >= this.width || y < 0 || y >= this.height || visited[y][x]) {
+      if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
         continue
       }
 
-      const particle = this.particles[y][x]
+      const visitedRow = visited[y]
+      if (!visitedRow || visitedRow[x]) {
+        continue
+      }
+
+      const particle = this.getParticle(x, y)
       if (!particle) {
         continue
       }
@@ -431,7 +448,7 @@ export class SandSimulation {
       }
 
       // Mark as visited and add to group
-      visited[y][x] = true
+      visitedRow[x] = true
       group.push({ x, y })
 
       // Add adjacent cells to stack (4-directional connectivity)
@@ -479,7 +496,7 @@ export class SandSimulation {
     // Draw each sand particle as a small colored square
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
-        const particle = this.particles[y][x]
+        const particle = this.getParticle(x, y)
         if (particle) {
           const particleKey = `${x},${y}`
 
@@ -515,12 +532,12 @@ export class SandSimulation {
   }
 
   // Get all particles (for debugging/state sync)
-  getParticles(): SandParticle[][] {
+  getParticles(): (SandParticle | null)[][] {
     return this.particles
   }
 
   // Set particles state (for receiving from network)
-  setParticles(particles: SandParticle[][]): void {
+  setParticles(particles: (SandParticle | null)[][]): void {
     this.particles = particles
   }
 
@@ -530,7 +547,7 @@ export class SandSimulation {
       `Creating test line at y=${y} with type ${type} and color ${color} spanning full width (0 to ${this.width - 1})`,
     )
     for (let x = 0; x < this.width; x++) {
-      this.particles[y][x] = { color, type }
+      this.setParticle(x, y, { color, type })
     }
   }
 
@@ -547,11 +564,11 @@ export class SandSimulation {
 
       // Place particle at main diagonal position
       if (y < this.height) {
-        this.particles[y][x] = { color, type }
+        this.setParticle(x, y, { color, type })
 
         // Add thickness to ensure connectivity (3 pixels thick)
-        if (y > 0) this.particles[y - 1][x] = { color, type }
-        if (y < this.height - 1) this.particles[y + 1][x] = { color, type }
+        if (y > 0) this.setParticle(x, y - 1, { color, type })
+        if (y < this.height - 1) this.setParticle(x, y + 1, { color, type })
       }
     }
 
@@ -569,11 +586,11 @@ export class SandSimulation {
       const y = Math.floor(midY + zigzagOffset)
 
       if (y >= 0 && y < this.height) {
-        this.particles[y][x] = { color, type }
+        this.setParticle(x, y, { color, type })
 
         // Add some vertical connectivity to ensure the path is connected
-        if (y > 0) this.particles[y - 1][x] = { color, type }
-        if (y < this.height - 1) this.particles[y + 1][x] = { color, type }
+        if (y > 0) this.setParticle(x, y - 1, { color, type })
+        if (y < this.height - 1) this.setParticle(x, y + 1, { color, type })
       }
     }
   }
@@ -584,7 +601,7 @@ export class SandSimulation {
     for (let y = 0; y < this.height; y++) {
       let row = ''
       for (let x = 0; x < this.width; x++) {
-        if (this.particles[y][x]) {
+        if (this.getParticle(x, y)) {
           row += '█'
         } else {
           row += '.'
@@ -599,7 +616,7 @@ export class SandSimulation {
     console.log('Clearing all particles...')
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
-        this.particles[y][x] = null
+        this.setParticle(x, y, null)
       }
     }
   }
@@ -617,7 +634,7 @@ export class SandSimulation {
     for (let y = startY; y < Math.min(startY + height, this.height); y++) {
       let row = `${y.toString().padStart(3, ' ')}: `
       for (let x = startX; x < Math.min(startX + width, this.width); x++) {
-        const particle = this.particles[y][x]
+        const particle = this.getParticle(x, y)
         if (particle) {
           row += particle.type.charAt(0).toUpperCase() // R, G, B, Y
         } else {
@@ -638,7 +655,7 @@ export class SandSimulation {
     // Debug: Show types on left and right borders
     console.log(`🔍 Left border types:`)
     for (let y = 0; y < Math.min(10, this.height); y++) {
-      const particle = this.particles[y][0]
+      const particle = this.getParticle(0, y)
       if (particle) {
         console.log(`  (0,${y}): type='${particle.type}', color='${particle.color}'`)
       }
@@ -646,7 +663,7 @@ export class SandSimulation {
 
     console.log(`🔍 Right border types:`)
     for (let y = 0; y < Math.min(10, this.height); y++) {
-      const particle = this.particles[y][this.width - 1]
+      const particle = this.getParticle(this.width - 1, y)
       if (particle) {
         console.log(
           `  (${this.width - 1},${y}): type='${particle.type}', color='${particle.color}'`,
@@ -656,8 +673,9 @@ export class SandSimulation {
 
     // Check each particle on the left border
     for (let y = 0; y < this.height; y++) {
-      const leftParticle = this.particles[y][0]
-      if (!leftParticle || visited[y][0]) continue
+      const leftParticle = this.getParticle(0, y)
+      const visitedRow = visited[y]
+      if (!leftParticle || !visitedRow || visitedRow[0]) continue
 
       console.log(
         `🔍 Found left border particle at (0,${y}) with type '${leftParticle.type}' and color '${leftParticle.color}'`,
