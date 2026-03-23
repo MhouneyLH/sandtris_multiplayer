@@ -8,12 +8,16 @@ export class SandSimulation {
   private height: number
   private particleSize: number // Size of each sand grain in pixels (2x2 or 4x4)
   private frameCounter: number = 0
+  private updateInterval: number // How many frames between sand updates (lower = faster)
 
-  constructor(tetrisWidth: number, tetrisHeight: number, tetrisCellSize: number = 30) {
+  constructor(tetrisWidth: number, tetrisHeight: number, tetrisCellSize: number = 30, sandUpdateSpeed: number = 1) {
     // Create a fine grid where each sand particle is 4x4 pixels
     this.particleSize = 4
     this.width = Math.floor((tetrisWidth * tetrisCellSize) / this.particleSize)
     this.height = Math.floor((tetrisHeight * tetrisCellSize) / this.particleSize)
+
+    // Set sand update frequency (1 = every frame, 2 = every 2 frames, etc.)
+    this.updateInterval = sandUpdateSpeed
 
     // Initialize 2D array with null values
     this.particles = Array.from({ length: this.height }, () =>
@@ -63,6 +67,10 @@ export class SandSimulation {
   }
 
   update(): void {
+    // Control sand update frequency
+    this.frameCounter++
+    if (this.frameCounter % this.updateInterval !== 0) return
+
     // Simple sand physics exactly like the CodePen - process from bottom-right to top-left
     for (let y = this.height - 2; y >= 0; y--) {
       for (let x = this.width - 1; x >= 0; x--) {
@@ -164,6 +172,16 @@ export class SandSimulation {
         }
       }
     }
+  }
+
+  // Adjust sand simulation speed (1 = fastest, higher numbers = slower)
+  setSandSpeed(speed: number): void {
+    this.updateInterval = Math.max(1, speed) // Ensure minimum speed of 1
+  }
+
+  // Get current sand speed
+  getSandSpeed(): number {
+    return this.updateInterval
   }
 
   private fillRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void {

@@ -61,6 +61,9 @@ let lastRightMove = 0
 let lastRotate = 0
 let lastDrop = 0
 
+// Sand simulation speed (1 = fastest, higher = slower)
+const SAND_UPDATE_SPEED = 4
+
 // Initialize game
 onMounted(() => {
   if (!gameCanvas.value) return
@@ -69,7 +72,12 @@ onMounted(() => {
   if (!ctx) return
 
   // Initialize sand simulation (using tetris grid dimensions)
-  sandSimulation = new SandSimulation(GRID_WIDTH, GRID_HEIGHT, CELL_SIZE)
+  sandSimulation = new SandSimulation(GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, SAND_UPDATE_SPEED)
+
+  // Example: To change sand speed during gameplay:
+  // sandSimulation.setSandSpeed(1)  // Fastest (every frame)
+  // sandSimulation.setSandSpeed(3)  // Slower (every 3 frames)
+  // sandSimulation.setSandSpeed(5)  // Much slower (every 5 frames)
 
   // Spawn first piece if this is your game
   if (props.isYours) {
