@@ -1,7 +1,7 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { WebSocketClient } from './WebSocketClient'
 import { WS_URL, EVENT_TYPES, MATCH_IDS } from './constants'
-import type { ConnectionState, QueueUpdatedPayload } from './types'
+import type { ConnectionState, QueueUpdatedPayload, MatchStartedPayload } from './types'
 
 // Singleton instance (shared across components)
 let wsClient: WebSocketClient | null = null
@@ -55,6 +55,22 @@ export function useWebSocket() {
   }
 
   /**
+   * Add event listener for specific events
+   */
+  const addEventListener = <T = unknown>(eventType: string, handler: (data: T) => void): void => {
+    if (!wsClient) return
+    wsClient.on(eventType, handler)
+  }
+
+  /**
+   * Remove event listener
+   */
+  const removeEventListener = <T = unknown>(eventType: string, handler: (data: T) => void): void => {
+    if (!wsClient) return
+    wsClient.off(eventType, handler)
+  }
+
+  /**
    * Disconnect from WebSocket server
    */
   const disconnect = (): void => {
@@ -82,5 +98,7 @@ export function useWebSocket() {
     connect,
     subscribeLobby,
     disconnect,
+    addEventListener,
+    removeEventListener,
   }
 }

@@ -1,15 +1,29 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import MatchQueue from './components/MatchQueue.vue'
+import GameScreen from './components/GameScreen.vue'
 import { JoinMatchQueue, LeaveMatchQueue, GetQueueSize } from './services/SandtrisService'
 import { useWebSocket } from './services/websocket/useWebSocket'
+import type { MatchStartedPayload } from './services/websocket/types'
 
 const inQueue = ref(false)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
 
+// Game state
+const gameState = ref<'queue' | 'playing'>('queue')
+const matchData = ref<MatchStartedPayload | null>(null)
+
 // WebSocket integration
-const { connectionState, queueSize, isConnected, connect, subscribeLobby } = useWebSocket()
+const { connectionState, queueSize, isConnected, connect, subscribeLobby, addEventListener } = useWebSocket()
+
+// Handle match started event
+const handleMatchStarted = (data: MatchStartedPayload) => {
+  console.log('Match started!', data)
+  matchData.value = data
+  gameState.value = 'playing'
+  inQueue.value = false // No longer in queue
+}
 
 function generateRandomId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -92,6 +106,9 @@ onMounted(async () => {
     await connect()
     subscribeLobby()
 
+    // Listen for match started events
+    addEventListener<MatchStartedPayload>('match-started', handleMatchStarted)
+
     // Fetch initial queue size after connection is established
     const initialSize = await GetQueueSize()
     if (initialSize >= 0) {
@@ -108,7 +125,24 @@ onMounted(async () => {
 
 <template>
   <h1>Multiplayer Sandtris</h1>
-  <MatchQueue :inQueue="inQueue" :queueSize="queueSize" :connectionState="connectionState" @join="handleJoinQueue"
-    @leave="handleLeaveQueue" />
-  <p v-if="errorMessage" role="alert">{{ errorMessage }}</p>
+
+  <!-- Queue Screen -->
+  <div v-if="gameState === 'queue'">
+    <MatchQueue
+      :inQueue="inQueue"
+      :queueSize="queueSize"
+      :connectionState="connectionState"
+      @join="handleJoinQueue"
+      @leave="handleLeaveQueue"
+    />
+    <p v-if="errorMessage" role="alert">{{ errorMessage }}</p>
+  </div>
+
+  <!-- Game Screen -->
+  <div v-else-if="gameState === 'playing' && matchData">
+    <GameScreen
+      :playerId="playerId"
+      :matchData="matchData"
+    />
+  </div>
 </template>
