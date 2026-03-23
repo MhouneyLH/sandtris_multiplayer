@@ -93,6 +93,36 @@ onMounted(() => {
   gameLoop()
 })
 
+// Helper function to convert piece hex color to type
+const getColorType = (hexColor: string): string => {
+  // Map piece colors to simplified types
+  const colorMap: { [key: string]: string } = {
+    '#ff0000': 'red',     // Red
+    '#ed4444': 'red',     // Red variant
+    '#f14545': 'red',     // Red variant
+    '#ef4444': 'red',     // Red - actual color from TetrisPiece.ts
+    '#00ff00': 'green',   // Green
+    '#22c65e': 'green',   // Green variant
+    '#22c75f': 'green',   // Green variant
+    '#22c45d': 'green',   // Green variant
+    '#22c55e': 'green',   // Green - actual color from TetrisPiece.ts
+    '#0000ff': 'blue',    // Blue
+    '#3b83f7': 'blue',    // Blue variant
+    '#3b82f6': 'blue',    // Blue - actual color from TetrisPiece.ts
+    '#ffff00': 'yellow',  // Yellow
+    '#e8b208': 'yellow',  // Yellow variant
+    '#f59e0b': 'yellow',  // Yellow variant
+    '#eab308': 'yellow',  // Yellow - actual color from TetrisPiece.ts
+  }
+
+  const type = colorMap[hexColor]
+  if (!type) {
+    console.warn(`Unknown color ${hexColor}, defaulting to 'red'`)
+    return 'red'
+  }
+  return type
+}
+
 const spawnNewPiece = () => {
   currentPiece = getRandomPiece()
   currentPiece.x = Math.floor(VISUAL_WIDTH / 2) - 1
@@ -139,19 +169,19 @@ const setupControls = () => {
       case 't':  // Test horizontal line
       case 'T':
         console.log('Creating test horizontal line...')
-        sandSimulation.createTestLine(Math.floor(GRID_HEIGHT * 0.8), '#ff0000')
+        sandSimulation.createTestLine(Math.floor(GRID_HEIGHT * 0.8), 'red', '#ff0000')
         handled = true
         break
       case 'y':  // Test diagonal line
       case 'Y':
         console.log('Creating test diagonal line...')
-        sandSimulation.createTestDiagonal('#00ff00')
+        sandSimulation.createTestDiagonal('green', '#00ff00')
         handled = true
         break
       case 'r':  // Test zigzag line
       case 'R':
         console.log('Creating test zigzag line...')
-        sandSimulation.createTestZigzag('#0000ff')
+        sandSimulation.createTestZigzag('blue', '#0000ff')
         handled = true
         break
       case 'u':  // Manually trigger completion check
@@ -180,6 +210,13 @@ const setupControls = () => {
       case 'S':
         sameColorMode = !sameColorMode
         console.log(`Same color mode: ${sameColorMode ? 'ON' : 'OFF'}${sameColorMode ? ` (color: ${lastPieceColor})` : ''}`)
+        handled = true
+        break
+      case 'p':  // Show particle types
+      case 'P':
+        console.log('Showing particle types around borders...')
+        sandSimulation.debugShowTypes(0, 140, 10, 10) // Left side bottom
+        sandSimulation.debugShowTypes(65, 140, 10, 10) // Right side bottom
         handled = true
         break
     }
@@ -305,28 +342,27 @@ const lockPiece = () => {
         const gridY = currentPiece.y + y
 
         if (gridY >= 0) {
-          // In same color mode, don't vary the color to ensure perfect matching
-          const finalColor = sameColorMode ? currentPiece.color : (() => {
-            // Very minimal color variation for cleaner look
-            const colorVariation = Math.random() * 0.02 - 0.01 // ±1% brightness (much less variation)
-            return varyColor(currentPiece.color, colorVariation)
-          })()
+          // Always apply visual color variation for aesthetic appeal
+          const colorVariation = Math.random() * 0.02 - 0.01 // ±1% brightness variation
+          const variedColor = varyColor(currentPiece.color, colorVariation)
+
+          // Get the logical type for grouping (no variation)
+          const pieceType = getColorType(currentPiece.color)
+          console.log(`Locking piece: color=${currentPiece.color}, type=${pieceType}`)
 
           // Fill the entire tetris block area with sand particles
-          sandSimulation.fillTetrisBlock(gridX, gridY, finalColor, CELL_SIZE)
+          sandSimulation.fillTetrisBlock(gridX, gridY, variedColor, pieceType, CELL_SIZE)
         }
       }
     }
   }
 
-  // Check for completed lines
-  console.log('Checking for completions after piece lock...')
+  // Check for completed lines immediately when piece locks
+  console.log(`🎯 Piece locked! Checking for completions...`)
   const completedLines = sandSimulation.checkCompletedLines()
-  console.log('TetrisGame: Found', completedLines.length, 'completed groups')
   if (completedLines.length > 0) {
     // Count particles that will be cleared for scoring
     const particlesCleared = sandSimulation.countParticlesInConnectedGroups()
-    console.log('TetrisGame: Will clear', particlesCleared, 'particles')
 
     linesCleared += particlesCleared // Now represents particles cleared, not lines
     score += particlesCleared * 10 + (particlesCleared > 10 ? Math.floor(particlesCleared / 10) * 50 : 0) // Bonus for larger groups
@@ -335,6 +371,8 @@ const lockPiece = () => {
 
     // Emit score update
     emit('scoreUpdate', { score, lines: linesCleared })
+  } else {
+    console.log(`🎯 No completions found.`)
   }
 
   // Spawn new piece

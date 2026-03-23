@@ -1,5 +1,6 @@
 interface SandParticle {
-  color: string
+  color: string  // Visual color (can be varied)
+  type: string   // Logical type for grouping ("red", "green", "blue", "yellow")
 }
 
 export class SandSimulation {
@@ -38,14 +39,14 @@ export class SandSimulation {
   }
 
   // Fill a tetris block area with sand particles
-  fillTetrisBlock(tetrisX: number, tetrisY: number, color: string, tetrisCellSize: number = 30): void {
+  fillTetrisBlock(tetrisX: number, tetrisY: number, visualColor: string, type: string, tetrisCellSize: number = 30): void {
     const { sandX, sandY, sandWidth, sandHeight } = this.tetrisToSand(tetrisX, tetrisY, tetrisCellSize)
 
     // Fill the entire tetris block area with sand particles
     for (let y = sandY; y < sandY + sandHeight && y < this.height; y++) {
       for (let x = sandX; x < sandX + sandWidth && x < this.width; x++) {
         if (x >= 0 && y >= 0) {
-          this.particles[y][x] = { color }
+          this.particles[y][x] = { color: visualColor, type }
         }
       }
     }
@@ -129,35 +130,39 @@ export class SandSimulation {
   }
 
   checkCompletedLines(): { x: number; y: number }[][] {
-    // Find same-color connected groups that span from left border to right border
+    // Find same-type connected groups that span from left border to right border
     const connectedGroups: { x: number; y: number }[][] = []
     const visited = Array.from({ length: this.height }, () => Array(this.width).fill(false))
+
+    console.log(`🔍 Checking for completions...`)
 
     // Check each particle on the left border
     for (let y = 0; y < this.height; y++) {
       const leftParticle = this.particles[y][0]
       if (!leftParticle || visited[y][0]) continue
 
+      console.log(`🔍 Starting flood fill from (0,${y}) with type: '${leftParticle.type}'`)
+
       // Find connected group starting from this left border particle
-      const group = this.floodFill(0, y, leftParticle.color, visited)
+      const group = this.floodFill(0, y, leftParticle.type, visited)
 
       // Check if this group reaches the right border
       const reachesRightBorder = group.some(pos => pos.x === this.width - 1)
 
+      console.log(`🔍 Group from (0,${y}): type='${leftParticle.type}', ${group.length} particles, reaches right border: ${reachesRightBorder}`)
+
       if (reachesRightBorder) {
         connectedGroups.push(group)
-        console.log(`✅ Found spanning group: ${group.length} particles of color ${leftParticle.color}`)
+        console.log(`✅ Found spanning group: ${group.length} particles of type '${leftParticle.type}'`)
       }
     }
 
-    if (connectedGroups.length > 0) {
-      console.log(`🎯 Total spanning groups found: ${connectedGroups.length}`)
-    }
+    console.log(`🎯 Total spanning groups found: ${connectedGroups.length}`)
     return connectedGroups
   }
 
-  // Flood fill to find all connected particles of the same color
-  private floodFill(startX: number, startY: number, color: string, visited: boolean[][]): { x: number; y: number }[] {
+  // Flood fill to find all connected particles of the same type
+  private floodFill(startX: number, startY: number, type: string, visited: boolean[][]): { x: number; y: number }[] {
     const group: { x: number; y: number }[] = []
     const stack = [{ x: startX, y: startY }]
 
@@ -170,7 +175,15 @@ export class SandSimulation {
       }
 
       const particle = this.particles[y][x]
-      if (!particle || particle.color !== color) {
+      if (!particle) {
+        continue
+      }
+
+      if (particle.type !== type) {
+        // Debug: Log type mismatches to see if mixed types are being processed
+        if (group.length < 10) { // Only log first few mismatches to avoid spam
+          console.log(`🚫 Type mismatch at (${x},${y}): expected '${type}', found '${particle.type}'`)
+        }
         continue
       }
 
@@ -305,16 +318,16 @@ export class SandSimulation {
   }
 
   // Testing function - create a simple horizontal line for debugging
-  createTestLine(y: number, color: string = '#ff0000'): void {
-    console.log(`Creating test line at y=${y} with color ${color} spanning full width (0 to ${this.width-1})`)
+  createTestLine(y: number, type: string = 'red', color: string = '#ff0000'): void {
+    console.log(`Creating test line at y=${y} with type ${type} and color ${color} spanning full width (0 to ${this.width-1})`)
     for (let x = 0; x < this.width; x++) {
-      this.particles[y][x] = { color }
+      this.particles[y][x] = { color, type }
     }
   }
 
   // Testing function - create a diagonal line for debugging
-  createTestDiagonal(color: string = '#00ff00'): void {
-    console.log(`Creating test diagonal with color ${color} from (0,0) to (${this.width-1},${this.height-1})`)
+  createTestDiagonal(type: string = 'green', color: string = '#00ff00'): void {
+    console.log(`Creating test diagonal with type ${type} and color ${color} from (0,0) to (${this.width-1},${this.height-1})`)
 
     // Create a thick connected diagonal to ensure no gaps
     for (let x = 0; x < this.width; x++) {
@@ -323,11 +336,11 @@ export class SandSimulation {
 
       // Place particle at main diagonal position
       if (y < this.height) {
-        this.particles[y][x] = { color }
+        this.particles[y][x] = { color, type }
 
         // Add thickness to ensure connectivity (3 pixels thick)
-        if (y > 0) this.particles[y-1][x] = { color }
-        if (y < this.height - 1) this.particles[y+1][x] = { color }
+        if (y > 0) this.particles[y-1][x] = { color, type }
+        if (y < this.height - 1) this.particles[y+1][x] = { color, type }
       }
     }
 
@@ -335,8 +348,8 @@ export class SandSimulation {
   }
 
   // Testing function - create a zigzag pattern for debugging
-  createTestZigzag(color: string = '#0000ff'): void {
-    console.log(`Creating test zigzag with color ${color} spanning full width`)
+  createTestZigzag(type: string = 'blue', color: string = '#0000ff'): void {
+    console.log(`Creating test zigzag with type ${type} and color ${color} spanning full width`)
     const midY = Math.floor(this.height * 0.7)
 
     // Create a zigzag pattern that definitely spans left to right
@@ -345,11 +358,11 @@ export class SandSimulation {
       const y = Math.floor(midY + zigzagOffset)
 
       if (y >= 0 && y < this.height) {
-        this.particles[y][x] = { color }
+        this.particles[y][x] = { color, type }
 
         // Add some vertical connectivity to ensure the path is connected
-        if (y > 0) this.particles[y-1][x] = { color }
-        if (y < this.height - 1) this.particles[y+1][x] = { color }
+        if (y > 0) this.particles[y-1][x] = { color, type }
+        if (y < this.height - 1) this.particles[y+1][x] = { color, type }
       }
     }
   }
@@ -380,6 +393,23 @@ export class SandSimulation {
     }
   }
 
+  // Debug: Show types in a small region
+  debugShowTypes(startX: number = 0, startY: number = 0, width: number = 10, height: number = 10): void {
+    console.log(`🔍 Particle types in region (${startX},${startY}) to (${startX + width - 1},${startY + height - 1}):`)
+    for (let y = startY; y < Math.min(startY + height, this.height); y++) {
+      let row = `${y.toString().padStart(3, ' ')}: `
+      for (let x = startX; x < Math.min(startX + width, this.width); x++) {
+        const particle = this.particles[y][x]
+        if (particle) {
+          row += particle.type.charAt(0).toUpperCase() // R, G, B, Y
+        } else {
+          row += '.'
+        }
+      }
+      console.log(row)
+    }
+  }
+
   // Debug version of checkCompletedLines with verbose logging
   debugCheckCompletedLines(): { x: number; y: number }[][] {
     const connectedGroups: { x: number; y: number }[][] = []
@@ -387,15 +417,32 @@ export class SandSimulation {
 
     console.log(`🔍 DEBUG: Checking for completed lines in ${this.width}x${this.height} grid`)
 
+    // Debug: Show types on left and right borders
+    console.log(`🔍 Left border types:`)
+    for (let y = 0; y < Math.min(10, this.height); y++) {
+      const particle = this.particles[y][0]
+      if (particle) {
+        console.log(`  (0,${y}): type='${particle.type}', color='${particle.color}'`)
+      }
+    }
+
+    console.log(`🔍 Right border types:`)
+    for (let y = 0; y < Math.min(10, this.height); y++) {
+      const particle = this.particles[y][this.width - 1]
+      if (particle) {
+        console.log(`  (${this.width-1},${y}): type='${particle.type}', color='${particle.color}'`)
+      }
+    }
+
     // Check each particle on the left border
     for (let y = 0; y < this.height; y++) {
       const leftParticle = this.particles[y][0]
       if (!leftParticle || visited[y][0]) continue
 
-      console.log(`🔍 Found left border particle at (0,${y}) with color ${leftParticle.color}`)
+      console.log(`🔍 Found left border particle at (0,${y}) with type '${leftParticle.type}' and color '${leftParticle.color}'`)
 
       // Find connected group starting from this left border particle
-      const group = this.floodFill(0, y, leftParticle.color, visited)
+      const group = this.floodFill(0, y, leftParticle.type, visited)
 
       // Get the min and max x coordinates of this group for debugging
       const minX = Math.min(...group.map(p => p.x))
@@ -403,7 +450,7 @@ export class SandSimulation {
 
       // Check if this group reaches the right border
       const reachesRightBorder = group.some(pos => pos.x === this.width - 1)
-      console.log(`🔍 Group from (0,${y}) with color ${leftParticle.color}: ${group.length} particles, x range: ${minX}-${maxX}, reaches right border (${this.width - 1}): ${reachesRightBorder}`)
+      console.log(`🔍 Group from (0,${y}) with type '${leftParticle.type}': ${group.length} particles, x range: ${minX}-${maxX}, reaches right border (${this.width - 1}): ${reachesRightBorder}`)
 
       if (reachesRightBorder) {
         connectedGroups.push(group)

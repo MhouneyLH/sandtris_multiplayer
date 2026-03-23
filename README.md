@@ -23,3 +23,7 @@ docker-compose -f docker-compose.dev.yml up --build -d
 ## Contributing
 
 Feel free to contribute to the project by submitting pull requests or reporting issues. Your contributions are always welcome! <3
+
+## References
+
+[Simple Sand Simulation Codepen](https://codepen.io/Gthibaud/pen/rmqEzM)
