@@ -16,52 +16,6 @@ export class TetrisPiece {
     const rotated = this.shape[0].map((_, i) => this.shape.map((row) => row[i]).reverse())
     this.shape = rotated
   }
-
-  // Get all occupied positions
-  getOccupiedPositions(): { x: number; y: number }[] {
-    const positions: { x: number; y: number }[] = []
-
-    for (let y = 0; y < this.shape.length; y++) {
-      for (let x = 0; x < this.shape[y].length; x++) {
-        if (this.shape[y][x]) {
-          positions.push({
-            x: this.x + x,
-            y: this.y + y,
-          })
-        }
-      }
-    }
-
-    return positions
-  }
-
-  // Check if piece would be at given position
-  wouldOverlapAt(x: number, y: number, checkFn: (x: number, y: number) => boolean): boolean {
-    const originalX = this.x
-    const originalY = this.y
-
-    this.x = x
-    this.y = y
-
-    const positions = this.getOccupiedPositions()
-    const wouldOverlap = positions.some((pos) => checkFn(pos.x, pos.y))
-
-    // Restore original position
-    this.x = originalX
-    this.y = originalY
-
-    return wouldOverlap
-  }
-
-  // Clone the piece
-  clone(): TetrisPiece {
-    return new TetrisPiece(
-      this.shape.map((row) => [...row]),
-      this.color,
-      this.x,
-      this.y,
-    )
-  }
 }
 
 // Predefined Tetris pieces

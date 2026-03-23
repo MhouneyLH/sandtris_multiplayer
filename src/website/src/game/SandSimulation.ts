@@ -1,6 +1,7 @@
 interface SandParticle {
-  color: string  // Visual color (can be varied)
-  type: string   // Logical type for grouping ("red", "green", "blue", "yellow")
+  color: string // Visual color (can be varied)
+  type: string // Logical type for grouping ("red", "green", "blue", "yellow")
+  groupId?: number
 }
 
 export class SandSimulation {
@@ -16,7 +17,13 @@ export class SandSimulation {
   private lastCompletionCheck = 0
   private completionCheckInterval = 10 // Check for completions every 10 frames
 
-  constructor(tetrisWidth: number, tetrisHeight: number, tetrisCellSize: number = 30, sandUpdateSpeed: number = 1, onCompletion?: (particlesCleared: number) => void) {
+  constructor(
+    tetrisWidth: number,
+    tetrisHeight: number,
+    tetrisCellSize: number = 30,
+    sandUpdateSpeed: number = 1,
+    onCompletion?: (particlesCleared: number) => void,
+  ) {
     // Create a fine grid where each sand particle is 4x4 pixels
     this.particleSize = 4
     this.width = Math.floor((tetrisWidth * tetrisCellSize) / this.particleSize)
@@ -30,39 +37,234 @@ export class SandSimulation {
 
     // Initialize 2D array with null values
     this.particles = Array.from({ length: this.height }, () =>
-      Array.from({ length: this.width }, () => null)
+      Array.from({ length: this.width }, () => null),
     )
   }
 
   // Convert tetris grid coordinates to sand particle coordinates
   private tetrisToSand(tetrisX: number, tetrisY: number, tetrisCellSize: number) {
+    const sandCellsPerTetrisCell = Math.max(1, Math.floor(tetrisCellSize / this.particleSize))
+
     return {
-      sandX: Math.floor((tetrisX * tetrisCellSize) / this.particleSize),
-      sandY: Math.floor((tetrisY * tetrisCellSize) / this.particleSize),
-      sandWidth: Math.floor(tetrisCellSize / this.particleSize),
-      sandHeight: Math.floor(tetrisCellSize / this.particleSize)
+      sandX: tetrisX * sandCellsPerTetrisCell,
+      sandY: tetrisY * sandCellsPerTetrisCell,
+      sandWidth: sandCellsPerTetrisCell,
+      sandHeight: sandCellsPerTetrisCell,
     }
   }
 
   // Fill a tetris block area with sand particles
-  fillTetrisBlock(tetrisX: number, tetrisY: number, visualColor: string, type: string, tetrisCellSize: number = 30): void {
-    const { sandX, sandY, sandWidth, sandHeight } = this.tetrisToSand(tetrisX, tetrisY, tetrisCellSize)
+  fillTetrisBlock(
+    tetrisX: number,
+    tetrisY: number,
+    visualColor: string,
+    type: string,
+    tetrisCellSize: number = 30,
+    groupId?: number,
+  ): void {
+    const { sandX, sandY, sandWidth, sandHeight } = this.tetrisToSand(
+      tetrisX,
+      tetrisY,
+      tetrisCellSize,
+    )
 
     // Fill the entire tetris block area with sand particles
     for (let y = sandY; y < sandY + sandHeight && y < this.height; y++) {
       for (let x = sandX; x < sandX + sandWidth && x < this.width; x++) {
         if (x >= 0 && y >= 0) {
-          this.particles[y][x] = { color: visualColor, type }
+          this.particles[y][x] = { color: visualColor, type, groupId }
         }
       }
     }
+  }
+
+  hasGroupParticles(groupId: number): boolean {
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        const particle = this.particles[y][x]
+        if (particle?.groupId === groupId) {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  canMoveGroupByTetrisCells(
+    groupId: number,
+    dxCells: number,
+    dyCells: number,
+    tetrisCellSize: number = 30,
+  ): boolean {
+    const { sandWidth, sandHeight } = this.tetrisToSand(0, 0, tetrisCellSize)
+    const dx = dxCells * sandWidth
+    const dy = dyCells * sandHeight
+
+    if (dx === 0 && dy === 0) return true
+
+    const groupKeys = new Set<string>()
+    let hasAnyParticle = false
+
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        const particle = this.particles[y][x]
+        if (particle?.groupId === groupId) {
+          groupKeys.add(`${x},${y}`)
+          hasAnyParticle = true
+        }
+      }
+    }
+
+    if (!hasAnyParticle) return false
+
+    for (const key of groupKeys) {
+      const [x, y] = key.split(',').map(Number)
+      const targetX = x + dx
+      const targetY = y + dy
+
+      if (targetX < 0 || targetX >= this.width || targetY < 0 || targetY >= this.height) {
+        return false
+      }
+
+      const targetParticle = this.particles[targetY][targetX]
+      if (targetParticle && !groupKeys.has(`${targetX},${targetY}`)) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  moveGroupByTetrisCells(
+    groupId: number,
+    dxCells: number,
+    dyCells: number,
+    tetrisCellSize: number = 30,
+  ): boolean {
+    if (!this.canMoveGroupByTetrisCells(groupId, dxCells, dyCells, tetrisCellSize)) {
+      return false
+    }
+
+    const { sandWidth, sandHeight } = this.tetrisToSand(0, 0, tetrisCellSize)
+    const dx = dxCells * sandWidth
+    const dy = dyCells * sandHeight
+
+    if (dx === 0 && dy === 0) return true
+
+    const positions: { x: number; y: number; particle: SandParticle }[] = []
+    const groupKeys = new Set<string>()
+
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        const particle = this.particles[y][x]
+        if (particle?.groupId === groupId) {
+          positions.push({ x, y, particle })
+          groupKeys.add(`${x},${y}`)
+        }
+      }
+    }
+
+    if (positions.length === 0) return false
+
+    const ordered = [...positions]
+    ordered.sort((a, b) => {
+      if (dy > 0) return b.y - a.y
+      if (dy < 0) return a.y - b.y
+      if (dx > 0) return b.x - a.x
+      if (dx < 0) return a.x - b.x
+      return 0
+    })
+
+    for (const { x, y } of ordered) {
+      this.particles[y][x] = null
+    }
+
+    for (const { x, y, particle } of ordered) {
+      this.particles[y + dy][x + dx] = particle
+    }
+
+    return true
+  }
+
+  releaseGroup(groupId: number): void {
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        const particle = this.particles[y][x]
+        if (particle?.groupId === groupId) {
+          delete particle.groupId
+        }
+      }
+    }
+  }
+
+  rotateGroupClockwise(groupId: number): boolean {
+    const positions: { x: number; y: number; particle: SandParticle }[] = []
+    const groupKeys = new Set<string>()
+
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        const particle = this.particles[y][x]
+        if (particle?.groupId === groupId) {
+          positions.push({ x, y, particle })
+          groupKeys.add(`${x},${y}`)
+        }
+      }
+    }
+
+    if (positions.length === 0) return false
+
+    let minX = Infinity
+    let maxX = -Infinity
+    let minY = Infinity
+    let maxY = -Infinity
+    for (const { x, y } of positions) {
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+    }
+
+    const centerX = (minX + maxX) / 2
+    const centerY = (minY + maxY) / 2
+
+    const rotated = positions.map(({ x, y, particle }) => {
+      const relX = x - centerX
+      const relY = y - centerY
+      const targetX = Math.round(centerX - relY)
+      const targetY = Math.round(centerY + relX)
+      return { x, y, targetX, targetY, particle }
+    })
+
+    for (const { targetX, targetY } of rotated) {
+      if (targetX < 0 || targetX >= this.width || targetY < 0 || targetY >= this.height) {
+        return false
+      }
+      const targetParticle = this.particles[targetY][targetX]
+      if (targetParticle && !groupKeys.has(`${targetX},${targetY}`)) {
+        return false
+      }
+    }
+
+    for (const { x, y } of positions) {
+      this.particles[y][x] = null
+    }
+
+    for (const { targetX, targetY, particle } of rotated) {
+      this.particles[targetY][targetX] = particle
+    }
+
+    return true
   }
 
   // Check if any sand particle exists in a tetris block area
   hasParticleAt(tetrisX: number, tetrisY: number, tetrisCellSize: number = 30): boolean {
     if (tetrisX < 0 || tetrisY < 0) return true
 
-    const { sandX, sandY, sandWidth, sandHeight } = this.tetrisToSand(tetrisX, tetrisY, tetrisCellSize)
+    const { sandX, sandY, sandWidth, sandHeight } = this.tetrisToSand(
+      tetrisX,
+      tetrisY,
+      tetrisCellSize,
+    )
 
     // Check if any particle exists in this tetris block area
     for (let y = sandY; y < sandY + sandHeight && y < this.height; y++) {
@@ -116,14 +318,12 @@ export class SandSimulation {
           this.particles[y][x] = null
           this.particles[y + 1][x] = particle
           moved = true
-        }
-        else if (y < this.height - 1 && x < this.width - 1 && !this.particles[y + 1][x + 1]) {
+        } else if (y < this.height - 1 && x < this.width - 1 && !this.particles[y + 1][x + 1]) {
           // Fall down-right
           this.particles[y][x] = null
           this.particles[y + 1][x + 1] = particle
           moved = true
-        }
-        else if (y < this.height - 1 && x > 0 && !this.particles[y + 1][x - 1]) {
+        } else if (y < this.height - 1 && x > 0 && !this.particles[y + 1][x - 1]) {
           // Fall down-left
           this.particles[y][x] = null
           this.particles[y + 1][x - 1] = particle
@@ -178,13 +378,17 @@ export class SandSimulation {
       const group = this.floodFill(0, y, leftParticle.type, visited)
 
       // Check if this group reaches the right border
-      const reachesRightBorder = group.some(pos => pos.x === this.width - 1)
+      const reachesRightBorder = group.some((pos) => pos.x === this.width - 1)
 
-      console.log(`🔍 Group from (0,${y}): type='${leftParticle.type}', ${group.length} particles, reaches right border: ${reachesRightBorder}`)
+      console.log(
+        `🔍 Group from (0,${y}): type='${leftParticle.type}', ${group.length} particles, reaches right border: ${reachesRightBorder}`,
+      )
 
       if (reachesRightBorder) {
         connectedGroups.push(group)
-        console.log(`✅ Found spanning group: ${group.length} particles of type '${leftParticle.type}'`)
+        console.log(
+          `✅ Found spanning group: ${group.length} particles of type '${leftParticle.type}'`,
+        )
       }
     }
 
@@ -193,7 +397,12 @@ export class SandSimulation {
   }
 
   // Flood fill to find all connected particles of the same type
-  private floodFill(startX: number, startY: number, type: string, visited: boolean[][]): { x: number; y: number }[] {
+  private floodFill(
+    startX: number,
+    startY: number,
+    type: string,
+    visited: boolean[][],
+  ): { x: number; y: number }[] {
     const group: { x: number; y: number }[] = []
     const stack = [{ x: startX, y: startY }]
 
@@ -212,8 +421,11 @@ export class SandSimulation {
 
       if (particle.type !== type) {
         // Debug: Log type mismatches to see if mixed types are being processed
-        if (group.length < 10) { // Only log first few mismatches to avoid spam
-          console.log(`🚫 Type mismatch at (${x},${y}): expected '${type}', found '${particle.type}'`)
+        if (group.length < 10) {
+          // Only log first few mismatches to avoid spam
+          console.log(
+            `🚫 Type mismatch at (${x},${y}): expected '${type}', found '${particle.type}'`,
+          )
         }
         continue
       }
@@ -281,7 +493,12 @@ export class SandSimulation {
             ctx.fillStyle = particle.color
           }
 
-          ctx.fillRect(x * this.particleSize, y * this.particleSize, this.particleSize, this.particleSize)
+          ctx.fillRect(
+            x * this.particleSize,
+            y * this.particleSize,
+            this.particleSize,
+            this.particleSize,
+          )
         }
       }
     }
@@ -297,47 +514,6 @@ export class SandSimulation {
     return this.updateInterval
   }
 
-  private fillRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void {
-    ctx.beginPath()
-    ctx.moveTo(x + radius, y)
-    ctx.lineTo(x + width - radius, y)
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
-    ctx.lineTo(x + width, y + height - radius)
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
-    ctx.lineTo(x + radius, y + height)
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
-    ctx.lineTo(x, y + radius)
-    ctx.quadraticCurveTo(x, y, x + radius, y)
-    ctx.closePath()
-    ctx.fill()
-  }
-
-  private adjustBrightness(color: string, factor: number): string {
-    const hex = color.replace('#', '')
-    const r = Math.max(0, Math.min(255, Math.round(parseInt(hex.substr(0, 2), 16) * factor)))
-    const g = Math.max(0, Math.min(255, Math.round(parseInt(hex.substr(2, 2), 16) * factor)))
-    const b = Math.max(0, Math.min(255, Math.round(parseInt(hex.substr(4, 2), 16) * factor)))
-    return `rgb(${r}, ${g}, ${b})`
-  }
-
-  private lightenColor(color: string, amount: number): string {
-    // Simple color lightening
-    const hex = color.replace('#', '')
-    const r = Math.min(255, parseInt(hex.substr(0, 2), 16) + amount)
-    const g = Math.min(255, parseInt(hex.substr(2, 2), 16) + amount)
-    const b = Math.min(255, parseInt(hex.substr(4, 2), 16) + amount)
-    return `rgb(${r}, ${g}, ${b})`
-  }
-
-  private darkenColor(color: string, amount: number): string {
-    // Simple color darkening
-    const hex = color.replace('#', '')
-    const r = Math.max(0, parseInt(hex.substr(0, 2), 16) - amount)
-    const g = Math.max(0, parseInt(hex.substr(2, 2), 16) - amount)
-    const b = Math.max(0, parseInt(hex.substr(4, 2), 16) - amount)
-    return `rgb(${r}, ${g}, ${b})`
-  }
-
   // Get all particles (for debugging/state sync)
   getParticles(): SandParticle[][] {
     return this.particles
@@ -350,7 +526,9 @@ export class SandSimulation {
 
   // Testing function - create a simple horizontal line for debugging
   createTestLine(y: number, type: string = 'red', color: string = '#ff0000'): void {
-    console.log(`Creating test line at y=${y} with type ${type} and color ${color} spanning full width (0 to ${this.width-1})`)
+    console.log(
+      `Creating test line at y=${y} with type ${type} and color ${color} spanning full width (0 to ${this.width - 1})`,
+    )
     for (let x = 0; x < this.width; x++) {
       this.particles[y][x] = { color, type }
     }
@@ -358,7 +536,9 @@ export class SandSimulation {
 
   // Testing function - create a diagonal line for debugging
   createTestDiagonal(type: string = 'green', color: string = '#00ff00'): void {
-    console.log(`Creating test diagonal with type ${type} and color ${color} from (0,0) to (${this.width-1},${this.height-1})`)
+    console.log(
+      `Creating test diagonal with type ${type} and color ${color} from (0,0) to (${this.width - 1},${this.height - 1})`,
+    )
 
     // Create a thick connected diagonal to ensure no gaps
     for (let x = 0; x < this.width; x++) {
@@ -370,12 +550,12 @@ export class SandSimulation {
         this.particles[y][x] = { color, type }
 
         // Add thickness to ensure connectivity (3 pixels thick)
-        if (y > 0) this.particles[y-1][x] = { color, type }
-        if (y < this.height - 1) this.particles[y+1][x] = { color, type }
+        if (y > 0) this.particles[y - 1][x] = { color, type }
+        if (y < this.height - 1) this.particles[y + 1][x] = { color, type }
       }
     }
 
-    console.log(`Diagonal created: should span x=0 to x=${this.width-1}`)
+    console.log(`Diagonal created: should span x=0 to x=${this.width - 1}`)
   }
 
   // Testing function - create a zigzag pattern for debugging
@@ -392,25 +572,25 @@ export class SandSimulation {
         this.particles[y][x] = { color, type }
 
         // Add some vertical connectivity to ensure the path is connected
-        if (y > 0) this.particles[y-1][x] = { color, type }
-        if (y < this.height - 1) this.particles[y+1][x] = { color, type }
+        if (y > 0) this.particles[y - 1][x] = { color, type }
+        if (y < this.height - 1) this.particles[y + 1][x] = { color, type }
       }
     }
   }
 
   // Debug function - print grid state to console
   debugPrintGrid(): void {
-    console.log(`Grid state (${this.width}x${this.height}):`);
+    console.log(`Grid state (${this.width}x${this.height}):`)
     for (let y = 0; y < this.height; y++) {
-      let row = '';
+      let row = ''
       for (let x = 0; x < this.width; x++) {
         if (this.particles[y][x]) {
-          row += '█';
+          row += '█'
         } else {
-          row += '.';
+          row += '.'
         }
       }
-      console.log(`${y.toString().padStart(2, '0')}: ${row}`);
+      console.log(`${y.toString().padStart(2, '0')}: ${row}`)
     }
   }
 
@@ -425,8 +605,15 @@ export class SandSimulation {
   }
 
   // Debug: Show types in a small region
-  debugShowTypes(startX: number = 0, startY: number = 0, width: number = 10, height: number = 10): void {
-    console.log(`🔍 Particle types in region (${startX},${startY}) to (${startX + width - 1},${startY + height - 1}):`)
+  debugShowTypes(
+    startX: number = 0,
+    startY: number = 0,
+    width: number = 10,
+    height: number = 10,
+  ): void {
+    console.log(
+      `🔍 Particle types in region (${startX},${startY}) to (${startX + width - 1},${startY + height - 1}):`,
+    )
     for (let y = startY; y < Math.min(startY + height, this.height); y++) {
       let row = `${y.toString().padStart(3, ' ')}: `
       for (let x = startX; x < Math.min(startX + width, this.width); x++) {
@@ -461,7 +648,9 @@ export class SandSimulation {
     for (let y = 0; y < Math.min(10, this.height); y++) {
       const particle = this.particles[y][this.width - 1]
       if (particle) {
-        console.log(`  (${this.width-1},${y}): type='${particle.type}', color='${particle.color}'`)
+        console.log(
+          `  (${this.width - 1},${y}): type='${particle.type}', color='${particle.color}'`,
+        )
       }
     }
 
@@ -470,18 +659,22 @@ export class SandSimulation {
       const leftParticle = this.particles[y][0]
       if (!leftParticle || visited[y][0]) continue
 
-      console.log(`🔍 Found left border particle at (0,${y}) with type '${leftParticle.type}' and color '${leftParticle.color}'`)
+      console.log(
+        `🔍 Found left border particle at (0,${y}) with type '${leftParticle.type}' and color '${leftParticle.color}'`,
+      )
 
       // Find connected group starting from this left border particle
       const group = this.floodFill(0, y, leftParticle.type, visited)
 
       // Get the min and max x coordinates of this group for debugging
-      const minX = Math.min(...group.map(p => p.x))
-      const maxX = Math.max(...group.map(p => p.x))
+      const minX = Math.min(...group.map((p) => p.x))
+      const maxX = Math.max(...group.map((p) => p.x))
 
       // Check if this group reaches the right border
-      const reachesRightBorder = group.some(pos => pos.x === this.width - 1)
-      console.log(`🔍 Group from (0,${y}) with type '${leftParticle.type}': ${group.length} particles, x range: ${minX}-${maxX}, reaches right border (${this.width - 1}): ${reachesRightBorder}`)
+      const reachesRightBorder = group.some((pos) => pos.x === this.width - 1)
+      console.log(
+        `🔍 Group from (0,${y}) with type '${leftParticle.type}': ${group.length} particles, x range: ${minX}-${maxX}, reaches right border (${this.width - 1}): ${reachesRightBorder}`,
+      )
 
       if (reachesRightBorder) {
         connectedGroups.push(group)

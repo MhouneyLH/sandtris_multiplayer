@@ -10,7 +10,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { SandSimulation } from '../game/SandSimulation'
-import { TetrisPiece, getRandomPiece } from '../game/TetrisPiece'
+import { TETRIS_PIECES } from '../game/TetrisPiece'
 
 const props = defineProps<{
   playerId: string
@@ -37,33 +37,34 @@ const CELL_SIZE = BLOCK_SIZE
 const gameCanvas = ref<HTMLCanvasElement>()
 let ctx: CanvasRenderingContext2D | null = null
 let animationId: number | null = null
+let removeControls: (() => void) | null = null
 
 // Game state
 let sandSimulation: SandSimulation
-let currentPiece: TetrisPiece | null = null
 let score = 0
 let linesCleared = 0
-let dropTimer = 0
-let dropInterval = 120 // Drop every 120 frames (2 seconds at 60fps)
+let spawnTimer = 0
+const SPAWN_INTERVAL = 120 // Spawn every 120 frames (2 seconds at 60fps)
+const NEXT_BLOCK_DELAY = 5
+let activeFigureId: number | null = null
+let nextFigureId = 1
 
 // Debug mode: same color spawning
 let sameColorMode = false
 let lastPieceColor = '#ff0000' // Default red
 
-// Key state tracking for simultaneous key presses
 const keyState = {
   left: false,
   right: false,
   down: false,
   up: false,
-  space: false
+  space: false,
 }
 
-// Simple timers to prevent too-fast input
 let lastLeftMove = 0
 let lastRightMove = 0
+let lastDownMove = 0
 let lastRotate = 0
-let lastDrop = 0
 
 // Sand simulation speed (1 = fastest, higher = slower)
 const SAND_UPDATE_SPEED = 4
@@ -91,10 +92,10 @@ onMounted(() => {
   // sandSimulation.setSandSpeed(3)  // Slower (every 3 frames)
   // sandSimulation.setSandSpeed(5)  // Much slower (every 5 frames)
 
-  // Spawn first piece if this is your game
+  // Spawn first sand pattern if this is your game
   if (props.isYours) {
-    spawnNewPiece()
-    setupControls()
+    spawnSandPattern()
+    removeControls = setupControls()
   }
 
   // Start game loop
@@ -131,26 +132,20 @@ const getColorType = (hexColor: string): string => {
   return type
 }
 
-const spawnNewPiece = () => {
-  currentPiece = getRandomPiece()
-  currentPiece.x = Math.floor(VISUAL_WIDTH / 2) - 1
-  currentPiece.y = 0
+const getRandomPattern = (): { shape: number[][]; color: string } => {
+  const pieces = Object.values(TETRIS_PIECES)
+  const pieceData = pieces[Math.floor(Math.random() * pieces.length)] ?? TETRIS_PIECES.I
 
-  // In same color mode, override the piece color
-  if (sameColorMode) {
-    currentPiece.color = lastPieceColor
-  } else {
-    // Store the color for potential same color mode
-    lastPieceColor = currentPiece.color
+  return {
+    shape: pieceData.shape.map((row: number[]) => [...row]),
+    color: pieceData.color,
   }
 }
 
 const setupControls = () => {
-  if (!props.isYours) return
+  if (!props.isYours) return () => { }
 
   const handleKeyDown = (e: KeyboardEvent) => {
-    if (!currentPiece) return
-
     let handled = false
 
     switch (e.key) {
@@ -270,108 +265,71 @@ const setupControls = () => {
   document.addEventListener('keydown', handleKeyDown)
   document.addEventListener('keyup', handleKeyUp)
 
-  // Clean up on unmount
-  onUnmounted(() => {
+  return () => {
     document.removeEventListener('keydown', handleKeyDown)
     document.removeEventListener('keyup', handleKeyUp)
-  })
-}
-
-const movePiece = (dx: number, dy: number) => {
-  if (!currentPiece) return
-
-  currentPiece.x += dx
-  currentPiece.y += dy
-
-  // Check collision (simple bounds check for now)
-  if (currentPiece.x < 0) currentPiece.x = 0
-  if (currentPiece.x + currentPiece.shape[0].length > GRID_WIDTH) {
-    currentPiece.x = GRID_WIDTH - currentPiece.shape[0].length
-  }
-
-  // If piece hit bottom or other sand, lock it
-  if (currentPiece.y + currentPiece.shape.length >= GRID_HEIGHT || willCollideWithSand()) {
-    if (dy > 0) {
-      lockPiece()
-    } else {
-      currentPiece.y -= dy // Revert Y movement if collision
-    }
   }
 }
 
-const rotatePiece = () => {
-  if (!currentPiece) return
+const canSpawnPatternAt = (shape: number[][], targetX: number, targetY: number): boolean => {
+  for (let y = 0; y < shape.length; y++) {
+    const row = shape[y]
+    if (!row) continue
 
-  // Try to rotate
-  const originalShape = currentPiece.shape.map(row => [...row]) // Backup original shape
-  currentPiece.rotate()
+    for (let x = 0; x < row.length; x++) {
+      if (!row[x]) continue
 
-  // Check if rotation is valid (bounds check)
-  if (currentPiece.x + currentPiece.shape[0].length > GRID_WIDTH || willCollideWithSand()) {
-    currentPiece.shape = originalShape // Revert if invalid
-  }
-}
+      const gridX = targetX + x
+      const gridY = targetY + y
 
-const dropPiece = () => {
-  if (!currentPiece) return
-
-  while (currentPiece.y + currentPiece.shape.length < GRID_HEIGHT && !willCollideWithSand()) {
-    currentPiece.y++
-  }
-  lockPiece()
-}
-
-const willCollideWithSand = (): boolean => {
-  if (!currentPiece) return false
-
-  // Check if piece will collide with existing sand particles
-  for (let y = 0; y < currentPiece.shape.length; y++) {
-    for (let x = 0; x < currentPiece.shape[y].length; x++) {
-      if (currentPiece.shape[y][x]) {
-        const gridX = currentPiece.x + x
-        const gridY = currentPiece.y + y + 1 // Check one position below
-
-        if (gridY >= GRID_HEIGHT) return true
-        if (sandSimulation.hasParticleAt(gridX, gridY, CELL_SIZE)) return true
+      if (gridX < 0 || gridX >= GRID_WIDTH || gridY >= GRID_HEIGHT) {
+        return false
       }
-    }
-  }
-  return false
-}
 
-const lockPiece = () => {
-  if (!currentPiece) return
-
-  // Convert tetris piece to sand - fill each block completely with tiny sand particles
-  for (let y = 0; y < currentPiece.shape.length; y++) {
-    for (let x = 0; x < currentPiece.shape[y].length; x++) {
-      if (currentPiece.shape[y][x]) {
-        const gridX = currentPiece.x + x
-        const gridY = currentPiece.y + y
-
-        if (gridY >= 0) {
-          // Always apply visual color variation for aesthetic appeal
-          const colorVariation = Math.random() * 0.02 - 0.01 // ±1% brightness variation
-          const variedColor = varyColor(currentPiece.color, colorVariation)
-
-          // Get the logical type for grouping (no variation)
-          const pieceType = getColorType(currentPiece.color)
-          console.log(`Locking piece: color=${currentPiece.color}, type=${pieceType}`)
-
-          // Fill the entire tetris block area with sand particles
-          sandSimulation.fillTetrisBlock(gridX, gridY, variedColor, pieceType, CELL_SIZE)
-        }
+      if (gridY >= 0 && sandSimulation.hasParticleAt(gridX, gridY, CELL_SIZE)) {
+        return false
       }
     }
   }
 
-  console.log(`🎯 Piece locked! Sand particles added.`)
+  return true
+}
 
-  // Spawn new piece
-  spawnNewPiece()
+const spawnSandPattern = (): boolean => {
+  const pattern = getRandomPattern()
+  const firstRow = pattern.shape[0] ?? []
+  const spawnX = Math.floor((GRID_WIDTH - firstRow.length) / 2)
+  const spawnY = 0
+  const figureId = nextFigureId++
 
-  // Reset drop timer
-  dropTimer = 0
+  if (!canSpawnPatternAt(pattern.shape, spawnX, spawnY)) {
+    return false
+  }
+
+  const pieceColor = sameColorMode ? lastPieceColor : pattern.color
+  if (!sameColorMode) {
+    lastPieceColor = pieceColor
+  }
+  const pieceType = getColorType(pieceColor)
+
+  for (let y = 0; y < pattern.shape.length; y++) {
+    const row = pattern.shape[y]
+    if (!row) continue
+
+    for (let x = 0; x < row.length; x++) {
+      if (!row[x]) continue
+
+      const gridX = spawnX + x
+      const gridY = spawnY + y
+      const colorVariation = Math.random() * 0.02 - 0.01
+      const variedColor = varyColor(pieceColor, colorVariation)
+      sandSimulation.fillTetrisBlock(gridX, gridY, variedColor, pieceType, CELL_SIZE, figureId)
+    }
+  }
+
+  activeFigureId = figureId
+
+  return true
 }
 
 // Helper function to vary color brightness
@@ -398,47 +356,59 @@ const gameLoop = () => {
 }
 
 const update = () => {
-  // Process key inputs if this is your game
-  if (props.isYours && currentPiece) {
-    const currentFrame = Date.now()
+  if (props.isYours) {
+    const now = Date.now()
 
-    // Handle left movement (not too fast)
-    if (keyState.left && currentFrame - lastLeftMove > 100) { // 100ms delay
-      movePiece(-1, 0)
-      lastLeftMove = currentFrame
+    if (activeFigureId !== null && !sandSimulation.hasGroupParticles(activeFigureId)) {
+      activeFigureId = null
     }
 
-    // Handle right movement (not too fast)
-    if (keyState.right && currentFrame - lastRightMove > 100) { // 100ms delay
-      movePiece(1, 0)
-      lastRightMove = currentFrame
+    if (activeFigureId !== null) {
+      if (!sandSimulation.canMoveGroupByTetrisCells(activeFigureId, 0, 1, CELL_SIZE)) {
+        sandSimulation.releaseGroup(activeFigureId)
+        activeFigureId = null
+        spawnTimer = Math.max(0, SPAWN_INTERVAL - NEXT_BLOCK_DELAY)
+      }
     }
 
-    // Handle down movement (faster drop)
-    if (keyState.down && currentFrame - lastDrop > 50) { // 50ms delay when pressing down
-      movePiece(0, 1)
-      lastDrop = currentFrame
-      dropTimer = 0 // Reset auto-drop timer
+    if (activeFigureId !== null) {
+      if (keyState.left && now - lastLeftMove > 90) {
+        sandSimulation.moveGroupByTetrisCells(activeFigureId, -1, 0, CELL_SIZE)
+        lastLeftMove = now
+      }
+
+      if (keyState.right && now - lastRightMove > 90) {
+        sandSimulation.moveGroupByTetrisCells(activeFigureId, 1, 0, CELL_SIZE)
+        lastRightMove = now
+      }
+
+      if (keyState.down && now - lastDownMove > 50) {
+        sandSimulation.moveGroupByTetrisCells(activeFigureId, 0, 1, CELL_SIZE)
+        lastDownMove = now
+      }
+
+      if (keyState.up && now - lastRotate > 150) {
+        sandSimulation.rotateGroupClockwise(activeFigureId)
+        lastRotate = now
+      }
+
+      if (keyState.space) {
+        while (sandSimulation.moveGroupByTetrisCells(activeFigureId, 0, 1, CELL_SIZE)) {
+          // Move until blocked.
+        }
+        keyState.space = false
+      }
     }
 
-    // Handle rotation (only once per press)
-    if (keyState.up && currentFrame - lastRotate > 150) { // 150ms delay to prevent multiple rotations
-      rotatePiece()
-      lastRotate = currentFrame
-    }
-
-    // Handle hard drop (only once per press)
-    if (keyState.space) {
-      dropPiece()
-      keyState.space = false // Reset immediately to prevent repeat
-    }
-
-    // Auto-drop piece (only if down key is not pressed)
-    if (!keyState.down) {
-      dropTimer++
-      if (dropTimer >= dropInterval) {
-        movePiece(0, 1)
-        dropTimer = 0
+    if (activeFigureId === null) {
+      spawnTimer += 1
+      if (spawnTimer >= SPAWN_INTERVAL) {
+        if (spawnSandPattern()) {
+          spawnTimer = 0
+        } else {
+          // Spawn area blocked; retry soon without hard-stalling the loop.
+          spawnTimer = SPAWN_INTERVAL - 10
+        }
       }
     }
   }
@@ -473,60 +443,13 @@ const render = () => {
   // Draw sand particles
   sandSimulation.render(ctx)
 
-  // Draw current piece (solid blocks with nice appearance)
-  if (currentPiece) {
-    for (let y = 0; y < currentPiece.shape.length; y++) {
-      for (let x = 0; x < currentPiece.shape[y].length; x++) {
-        if (currentPiece.shape[y][x]) {
-          const pixelX = (currentPiece.x + x) * CELL_SIZE
-          const pixelY = (currentPiece.y + y) * CELL_SIZE
-
-          // Main block
-          ctx.fillStyle = currentPiece.color
-          ctx.fillRect(pixelX + 1, pixelY + 1, CELL_SIZE - 2, CELL_SIZE - 2)
-
-          // Add 3D effect with highlights and shadows for falling pieces
-          // Highlight (top-left)
-          ctx.fillStyle = lightenColor(currentPiece.color, 0.3)
-          ctx.fillRect(pixelX + 1, pixelY + 1, CELL_SIZE - 2, 3)
-          ctx.fillRect(pixelX + 1, pixelY + 1, 3, CELL_SIZE - 2)
-
-          // Shadow (bottom-right)
-          ctx.fillStyle = darkenColor(currentPiece.color, 0.3)
-          ctx.fillRect(pixelX + 1, pixelY + CELL_SIZE - 4, CELL_SIZE - 2, 3)
-          ctx.fillRect(pixelX + CELL_SIZE - 4, pixelY + 1, 3, CELL_SIZE - 2)
-
-          // Inner border for definition
-          ctx.strokeStyle = darkenColor(currentPiece.color, 0.2)
-          ctx.lineWidth = 1
-          ctx.strokeRect(pixelX + 2, pixelY + 2, CELL_SIZE - 4, CELL_SIZE - 4)
-        }
-      }
-    }
-  }
-}
-
-// Helper functions for piece rendering
-const lightenColor = (color: string, factor: number): string => {
-  const hex = color.replace('#', '')
-  const r = Math.min(255, Math.round(parseInt(hex.substr(0, 2), 16) * (1 + factor)))
-  const g = Math.min(255, Math.round(parseInt(hex.substr(2, 2), 16) * (1 + factor)))
-  const b = Math.min(255, Math.round(parseInt(hex.substr(4, 2), 16) * (1 + factor)))
-  return `rgb(${r}, ${g}, ${b})`
-}
-
-const darkenColor = (color: string, factor: number): string => {
-  const hex = color.replace('#', '')
-  const r = Math.max(0, Math.round(parseInt(hex.substr(0, 2), 16) * (1 - factor)))
-  const g = Math.max(0, Math.round(parseInt(hex.substr(2, 2), 16) * (1 - factor)))
-  const b = Math.max(0, Math.round(parseInt(hex.substr(4, 2), 16) * (1 - factor)))
-  return `rgb(${r}, ${g}, ${b})`
 }
 
 onUnmounted(() => {
   if (animationId) {
     cancelAnimationFrame(animationId)
   }
+  removeControls?.()
 })
 </script>
 
