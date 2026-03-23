@@ -46,6 +46,21 @@ let linesCleared = 0
 let dropTimer = 0
 let dropInterval = 60 // Drop every 60 frames (1 second at 60fps)
 
+// Key state tracking for simultaneous key presses
+const keyState = {
+  left: false,
+  right: false,
+  down: false,
+  up: false,
+  space: false
+}
+
+// Simple timers to prevent too-fast input
+let lastLeftMove = 0
+let lastRightMove = 0
+let lastRotate = 0
+let lastDrop = 0
+
 // Initialize game
 onMounted(() => {
   if (!gameCanvas.value) return
@@ -82,23 +97,55 @@ const setupControls = () => {
 
     switch (e.key) {
       case 'ArrowLeft':
-        movePiece(-1, 0)
+        keyState.left = true
         handled = true
         break
       case 'ArrowRight':
-        movePiece(1, 0)
+        keyState.right = true
         handled = true
         break
       case 'ArrowDown':
-        movePiece(0, 1)
+        keyState.down = true
         handled = true
         break
       case 'ArrowUp':
-        rotatePiece()
+        keyState.up = true
         handled = true
         break
       case ' ':
-        dropPiece()
+        keyState.space = true
+        handled = true
+        break
+    }
+
+    if (handled) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }
+
+  const handleKeyUp = (e: KeyboardEvent) => {
+    let handled = false
+
+    switch (e.key) {
+      case 'ArrowLeft':
+        keyState.left = false
+        handled = true
+        break
+      case 'ArrowRight':
+        keyState.right = false
+        handled = true
+        break
+      case 'ArrowDown':
+        keyState.down = false
+        handled = true
+        break
+      case 'ArrowUp':
+        keyState.up = false
+        handled = true
+        break
+      case ' ':
+        keyState.space = false
         handled = true
         break
     }
@@ -110,10 +157,12 @@ const setupControls = () => {
   }
 
   document.addEventListener('keydown', handleKeyDown)
+  document.addEventListener('keyup', handleKeyUp)
 
   // Clean up on unmount
   onUnmounted(() => {
     document.removeEventListener('keydown', handleKeyDown)
+    document.removeEventListener('keyup', handleKeyUp)
   })
 }
 
@@ -190,8 +239,8 @@ const lockPiece = () => {
         const gridY = currentPiece.y + y
 
         if (gridY >= 0) {
-          // Add color variation for visual interest
-          const colorVariation = Math.random() * 0.1 - 0.05 // ±5% brightness
+          // Very minimal color variation for cleaner look
+          const colorVariation = Math.random() * 0.02 - 0.01 // ±1% brightness (much less variation)
           const variedColor = varyColor(currentPiece.color, colorVariation)
 
           // Fill the entire tetris block area with sand particles
@@ -247,12 +296,48 @@ const gameLoop = () => {
 }
 
 const update = () => {
-  // Auto-drop piece
+  // Process key inputs if this is your game
   if (props.isYours && currentPiece) {
-    dropTimer++
-    if (dropTimer >= dropInterval) {
+    const currentFrame = Date.now()
+
+    // Handle left movement (not too fast)
+    if (keyState.left && currentFrame - lastLeftMove > 100) { // 100ms delay
+      movePiece(-1, 0)
+      lastLeftMove = currentFrame
+    }
+
+    // Handle right movement (not too fast)
+    if (keyState.right && currentFrame - lastRightMove > 100) { // 100ms delay
+      movePiece(1, 0)
+      lastRightMove = currentFrame
+    }
+
+    // Handle down movement (faster drop)
+    if (keyState.down && currentFrame - lastDrop > 50) { // 50ms delay when pressing down
       movePiece(0, 1)
-      dropTimer = 0
+      lastDrop = currentFrame
+      dropTimer = 0 // Reset auto-drop timer
+    }
+
+    // Handle rotation (only once per press)
+    if (keyState.up && currentFrame - lastRotate > 150) { // 150ms delay to prevent multiple rotations
+      rotatePiece()
+      lastRotate = currentFrame
+    }
+
+    // Handle hard drop (only once per press)
+    if (keyState.space) {
+      dropPiece()
+      keyState.space = false // Reset immediately to prevent repeat
+    }
+
+    // Auto-drop piece (only if down key is not pressed)
+    if (!keyState.down) {
+      dropTimer++
+      if (dropTimer >= dropInterval) {
+        movePiece(0, 1)
+        dropTimer = 0
+      }
     }
   }
 

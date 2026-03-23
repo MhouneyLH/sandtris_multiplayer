@@ -10,8 +10,8 @@ export class SandSimulation {
   private frameCounter: number = 0
 
   constructor(tetrisWidth: number, tetrisHeight: number, tetrisCellSize: number = 30) {
-    // Create a fine grid where each sand particle is 3x3 pixels
-    this.particleSize = 3
+    // Create a fine grid where each sand particle is 4x4 pixels
+    this.particleSize = 4
     this.width = Math.floor((tetrisWidth * tetrisCellSize) / this.particleSize)
     this.height = Math.floor((tetrisHeight * tetrisCellSize) / this.particleSize)
 
