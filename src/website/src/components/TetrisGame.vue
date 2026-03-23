@@ -44,7 +44,7 @@ let currentPiece: TetrisPiece | null = null
 let score = 0
 let linesCleared = 0
 let dropTimer = 0
-let dropInterval = 60 // Drop every 60 frames (1 second at 60fps)
+let dropInterval = 120 // Drop every 120 frames (2 seconds at 60fps)
 
 // Key state tracking for simultaneous key presses
 const keyState = {

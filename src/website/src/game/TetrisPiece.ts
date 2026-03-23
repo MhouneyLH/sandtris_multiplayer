@@ -82,7 +82,7 @@ export const TETRIS_PIECES = {
       [0, 1, 0],
       [1, 1, 1],
     ],
-    color: '#10b981', // Green
+    color: '#22c55e', // Green
   },
   S: {
     shape: [
@@ -96,21 +96,21 @@ export const TETRIS_PIECES = {
       [1, 1, 0],
       [0, 1, 1],
     ],
-    color: '#f97316', // Orange
+    color: '#ef4444', // Red
   },
   J: {
     shape: [
       [1, 0, 0],
       [1, 1, 1],
     ],
-    color: '#8b5cf6', // Purple
+    color: '#3b82f6', // Blue
   },
   L: {
     shape: [
       [0, 0, 1],
       [1, 1, 1],
     ],
-    color: '#ec4899', // Pink
+    color: '#22c55e', // Green
   },
 }
 
