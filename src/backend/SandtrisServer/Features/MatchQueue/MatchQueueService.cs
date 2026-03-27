@@ -1,10 +1,13 @@
 using System.Collections.Concurrent;
 using SandtrisServer.Features.Game;
+using SandtrisServer.Features.Game.Model;
 
 namespace SandtrisServer.Features.MatchQueue;
 
 public sealed class MatchQueueService(ILogger<MatchQueueService> logger, WebSocketEventBus webSocketEventBus)
 {
+    private const string LobbyChannelId = "lobby";
+
     private readonly ConcurrentDictionary<string, DateTime> _queue = new();
     private readonly ILogger<MatchQueueService> _logger = logger;
     private readonly WebSocketEventBus _webSocketEventBus = webSocketEventBus;
@@ -25,9 +28,8 @@ public sealed class MatchQueueService(ILogger<MatchQueueService> logger, WebSock
         _queue[playerId] = DateTime.UtcNow;
 
         await _webSocketEventBus.PublishToMatchAsync(
-            matchId: WebSocketMessageDefaults.LobbyMatchId,
-            eventType: WebSocketEventTypes.QueueUpdated,
-            data: new QueueUpdatedPayload(QueueSize: _queue.Count, PlayerId: playerId, Action: QueueUpdateAction.Joined));
+            matchId: LobbyChannelId,
+            @event: new EventTypes.QueueUpdatedEvent(QueueSize: _queue.Count, PlayerId: playerId, Action: QueueUpdateAction.Joined));
 
         _logger.LogInformation("Successfully published queue update event for player {PlayerId} joining the queue.", playerId);
 
@@ -45,9 +47,8 @@ public sealed class MatchQueueService(ILogger<MatchQueueService> logger, WebSock
         _logger.LogInformation("Player {PlayerId} left the match queue.", playerId);
 
         await _webSocketEventBus.PublishToMatchAsync(
-            matchId: WebSocketMessageDefaults.LobbyMatchId,
-            eventType: WebSocketEventTypes.QueueUpdated,
-            data: new QueueUpdatedPayload(QueueSize: _queue.Count, PlayerId: playerId, Action: QueueUpdateAction.Left));
+            matchId: LobbyChannelId,
+            @event: new EventTypes.QueueUpdatedEvent(QueueSize: _queue.Count, PlayerId: playerId, Action: QueueUpdateAction.Left));
 
         _logger.LogInformation("Successfully published queue update event for player {PlayerId} leaving the queue.", playerId);
     }
@@ -93,19 +94,16 @@ public sealed class MatchQueueService(ILogger<MatchQueueService> logger, WebSock
                     playerB);
 
                 await _webSocketEventBus.PublishToMatchAsync(
-                    matchId: WebSocketMessageDefaults.LobbyMatchId,
-                    eventType: WebSocketEventTypes.MatchStarted,
-                    data: new MatchStartedPayload(matchId, players));
+                    matchId: LobbyChannelId,
+                    @event: new EventTypes.MatchStartedEvent(matchId, players));
 
                 await _webSocketEventBus.PublishToMatchAsync(
-                    matchId: WebSocketMessageDefaults.LobbyMatchId,
-                    eventType: WebSocketEventTypes.QueueUpdated,
-                    data: new QueueUpdatedPayload(QueueSize: _queue.Count, PlayerId: playerA, Action: QueueUpdateAction.Left));
+                    matchId: LobbyChannelId,
+                    @event: new EventTypes.QueueUpdatedEvent(QueueSize: _queue.Count, PlayerId: playerA, Action: QueueUpdateAction.Left));
 
                 await _webSocketEventBus.PublishToMatchAsync(
-                    matchId: WebSocketMessageDefaults.LobbyMatchId,
-                    eventType: WebSocketEventTypes.QueueUpdated,
-                    data: new QueueUpdatedPayload(QueueSize: _queue.Count, PlayerId: playerB, Action: QueueUpdateAction.Left));
+                    matchId: LobbyChannelId,
+                    @event: new EventTypes.QueueUpdatedEvent(QueueSize: _queue.Count, PlayerId: playerB, Action: QueueUpdateAction.Left));
             }
         }
         finally

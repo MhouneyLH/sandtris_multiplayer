@@ -1,0 +1,9 @@
+- streaming so that we can see opponents moves near real time
+- removing queue for:
+  - quick match button that utilizes the queue we already have
+  - Create Party with configuration like (party size -> maxSize = 4; code will be generated and sharable with friends)
+  - join party with the code from you friend
+- leaderboard with highest score ever made
+- Send low-frequency correction snapshots (or checksums) to fix drift -> !!!!LUCAS DO THIS BEFORE WE LAUNCH THIS TO PROD!!!! (otherwise especially for long matches we will have a problem and the game will be unplayable :( )
+- leaderboard with highest score in the last 24 hours
+- only spectate mode -> should just subscribe on the same match

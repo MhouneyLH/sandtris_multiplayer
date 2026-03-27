@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text.Json;
+using SandtrisServer.Features.Game.Model;
 
 namespace SandtrisServer.Features.Game;
 
@@ -90,22 +91,24 @@ public sealed class WebSocketEventBus(ILogger<WebSocketEventBus> logger)
         var subscribers = _matchSubscribers.GetOrAdd(normalizedMatchId, _ => new ConcurrentDictionary<string, byte>());
         subscribers[connectionId] = 0;
 
-        _logger.LogInformation("Connection {ConnectionId} subscribed to {MatchId}.", connectionId, normalizedMatchId);
+        _logger.LogInformation("Connection {ConnectionId} MatchSubscribed to {MatchId}.", connectionId, normalizedMatchId);
     }
 
     public void UnsubscribeFromMatch(string connectionId, string matchId)
     {
         RemoveSubscription(connectionId, NormalizeMatchId(matchId));
-        _logger.LogInformation("Connection {ConnectionId} unsubscribed from {MatchId}.", connectionId, matchId);
+        _logger.LogInformation("Connection {ConnectionId} MatchUnsubscribed from {MatchId}.", connectionId, matchId);
     }
 
-    public Task PublishToAllAsync<TPayload>(string eventType, TPayload data, CancellationToken cancellationToken = default)
+    public Task PublishToAllAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
+        where TEvent : IEvent
     {
         var targets = _connections.Keys.ToArray();
-        return PublishToConnectionsAsync(targets, eventType, null, data, cancellationToken);
+        return PublishToConnectionsAsync(targets, @event, cancellationToken);
     }
 
-    public Task PublishToMatchAsync<TPayload>(string matchId, string eventType, TPayload data, CancellationToken cancellationToken = default)
+    public Task PublishToMatchAsync<TEvent>(string matchId, TEvent @event, CancellationToken cancellationToken = default)
+        where TEvent : IEvent
     {
         var normalizedMatchId = NormalizeMatchId(matchId);
 
@@ -115,22 +118,21 @@ public sealed class WebSocketEventBus(ILogger<WebSocketEventBus> logger)
         }
 
         var targets = subscribers.Keys.ToArray();
-        return PublishToConnectionsAsync(targets, eventType, normalizedMatchId, data, cancellationToken);
+        return PublishToConnectionsAsync(targets, @event, cancellationToken);
     }
 
-    public Task SendToConnectionAsync<TPayload>(string connectionId, string eventType, string? matchId, TPayload data, CancellationToken cancellationToken = default)
+    public Task SendToConnectionAsync<TEvent>(string connectionId, TEvent @event, CancellationToken cancellationToken = default)
+        where TEvent : IEvent
     {
-        return PublishToConnectionsAsync([connectionId], eventType, matchId, data, cancellationToken);
+        return PublishToConnectionsAsync([connectionId], @event, cancellationToken);
     }
 
-    private async Task PublishToConnectionsAsync<TPayload>(string[] connectionIds, string eventType, string? matchId, TPayload data, CancellationToken cancellationToken)
+    private async Task PublishToConnectionsAsync<TEvent>(string[] connectionIds, TEvent @event, CancellationToken cancellationToken)
     {
-        var envelope = new WebSocketMessageWrapper<TPayload>(
-            EventType: eventType,
-            Version: WebSocketMessageDefaults.CurrentVersion,
+        var envelope = new WebSocketMessageWrapper<TEvent>(
             SentAt: DateTimeOffset.UtcNow,
-            Data: data,
-            MatchId: matchId ?? WebSocketMessageDefaults.LobbyMatchId
+            Event: @event,
+            Version: WebSocketMessageDefaults.CurrentVersion
         );
 
         var payload = JsonSerializer.SerializeToUtf8Bytes(envelope);
@@ -193,6 +195,11 @@ public sealed class WebSocketEventBus(ILogger<WebSocketEventBus> logger)
 
     private static string NormalizeMatchId(string matchId)
     {
-        return string.IsNullOrWhiteSpace(matchId) ? WebSocketMessageDefaults.LobbyMatchId : matchId.Trim();
+        if (string.IsNullOrWhiteSpace(matchId))
+        {
+            throw new ArgumentException("matchId is required.", nameof(matchId));
+        }
+
+        return matchId.Trim();
     }
 }

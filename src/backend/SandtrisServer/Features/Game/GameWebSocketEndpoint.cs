@@ -1,6 +1,7 @@
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using SandtrisServer.Features.Game.Model;
 
 namespace SandtrisServer.Features.Game;
 
@@ -40,11 +41,11 @@ public static class GameWebSocketEndpoint
 
         try
         {
-            await ReceiveLoopAsync(connectionId, socket, eventBus, gameService, logger, shutdownToken);
+            await ReceiveLoopAsync(connectionId, socket, eventBus, gameService, shutdownToken);
         }
-        catch (OperationCanceledException) when (shutdownToken.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (shutdownToken.IsCancellationRequested)
         {
-            logger.LogDebug("Connection {ConnectionId} receive loop cancelled due to shutdown/disconnect.", connectionId);
+            logger.LogDebug(ex, "Connection {ConnectionId} receive loop cancelled due to shutdown/disconnect.", connectionId);
         }
         finally
         {
@@ -57,7 +58,6 @@ public static class GameWebSocketEndpoint
         WebSocket socket,
         WebSocketEventBus eventBus,
         GameService gameService,
-        ILogger logger,
         CancellationToken cancellationToken)
     {
         var buffer = new byte[4096];
@@ -76,92 +76,153 @@ public static class GameWebSocketEndpoint
                 continue;
             }
 
-            if (TryDeserialize<ClientControlMessage>(payload, out var command) && !string.IsNullOrWhiteSpace(command?.Action))
-            {
-                var action = command.Action.Trim().ToLowerInvariant();
-                var matchId = string.IsNullOrWhiteSpace(command.MatchId) ? WebSocketMessageDefaults.LobbyMatchId : command.MatchId.Trim();
-
-                switch (action)
-                {
-                    case "subscribe":
-                        eventBus.SubscribeToMatch(connectionId, matchId);
-                        await eventBus.SendToConnectionAsync(
-                            connectionId,
-                            WebSocketEventTypes.Subscribed,
-                            matchId,
-                            new SubscriptionStatePayload(matchId),
-                            cancellationToken);
-                        break;
-
-                    case "unsubscribe":
-                        eventBus.UnsubscribeFromMatch(connectionId, matchId);
-                        await eventBus.SendToConnectionAsync(
-                            connectionId,
-                            WebSocketEventTypes.Unsubscribed,
-                            matchId,
-                            new SubscriptionStatePayload(matchId),
-                            cancellationToken);
-                        break;
-
-                    case "ping":
-                        await eventBus.SendToConnectionAsync(
-                            connectionId,
-                            WebSocketEventTypes.Pong,
-                            null,
-                            new PongPayload("pong"),
-                            cancellationToken);
-                        break;
-
-                    default:
-                        logger.LogWarning("Unknown control action {Action} from connection {ConnectionId}.", action, connectionId);
-                        break;
-                }
-
-                continue;
-            }
-
-            if (!TryDeserialize<ClientEventEnvelope>(payload, out var envelope) || string.IsNullOrWhiteSpace(envelope?.EventType))
+            if (!TryGetEventType(payload, out var eventType))
             {
                 continue;
             }
 
-            var eventType = envelope.EventType.Trim();
-
-            switch (eventType)
+            if (await HandleControlEventAsync(connectionId, payload, eventType, eventBus, cancellationToken))
             {
-                case WebSocketEventTypes.MatchStarted:
-                    if (TryDeserialize<ClientMatchStartedMessage>(payload, out var startedMessage) && startedMessage is not null)
-                    {
-                        await gameService.HandleClientMatchStartedAsync(connectionId, startedMessage.MatchId, startedMessage.Data, cancellationToken);
-                    }
-                    break;
-
-                case WebSocketEventTypes.MatchEnded:
-                    if (TryDeserialize<ClientMatchEndedMessage>(payload, out var endedMessage) && endedMessage is not null)
-                    {
-                        await gameService.HandleClientMatchEndedAsync(connectionId, endedMessage.MatchId, endedMessage.Data, cancellationToken);
-                    }
-                    break;
-
-                case WebSocketEventTypes.GameUpdate:
-                    if (TryDeserialize<ClientGameUpdateMessage>(payload, out var updateMessage) && updateMessage is not null)
-                    {
-                        await gameService.HandleClientGameUpdateAsync(connectionId, updateMessage.MatchId, updateMessage.Data, cancellationToken);
-                    }
-                    break;
-
-                default:
-                    if (TryDeserialize<ClientGenericGameEvent>(payload, out var genericMessage) && genericMessage is not null)
-                    {
-                        await gameService.HandleClientEventAsync(
-                            connectionId,
-                            genericMessage.EventType,
-                            genericMessage.MatchId,
-                            genericMessage.Data,
-                            cancellationToken);
-                    }
-                    break;
+                continue;
             }
+
+            await HandleGameEventAsync(connectionId, payload, eventType, gameService, cancellationToken);
+        }
+    }
+
+    private static async Task<bool> HandleControlEventAsync(
+        string connectionId,
+        string payload,
+        string eventType,
+        WebSocketEventBus eventBus,
+        CancellationToken cancellationToken)
+    {
+        if (eventType == EventTypes.SubscribeToMatchEvent.EventTypeName)
+        {
+            if (!TryDeserialize<WebSocketMessageWrapper<EventTypes.SubscribeToMatchEvent>>(payload, out var message) || message is null)
+            {
+                await eventBus.SendToConnectionAsync(
+                    connectionId,
+                    new EventTypes.ErrorEvent(string.Empty, "Invalid subscribe-to-match event payload."),
+                    cancellationToken);
+                return true;
+            }
+
+            var matchId = message.Event.MatchId?.Trim();
+            if (string.IsNullOrWhiteSpace(matchId))
+            {
+                await eventBus.SendToConnectionAsync(
+                    connectionId,
+                    new EventTypes.ErrorEvent(string.Empty, "matchId is required for subscribe-to-match."),
+                    cancellationToken);
+                return true;
+            }
+
+            eventBus.SubscribeToMatch(connectionId, matchId);
+            await eventBus.SendToConnectionAsync(
+                connectionId,
+                new EventTypes.MatchSubscribedEvent(matchId, connectionId),
+                cancellationToken);
+            return true;
+        }
+
+        if (eventType == EventTypes.UnsubscribeFromMatchEvent.EventTypeName)
+        {
+            if (!TryDeserialize<WebSocketMessageWrapper<EventTypes.UnsubscribeFromMatchEvent>>(payload, out var message) || message is null)
+            {
+                await eventBus.SendToConnectionAsync(
+                    connectionId,
+                    new EventTypes.ErrorEvent(string.Empty, "Invalid unsubscribe-from-match event payload."),
+                    cancellationToken);
+                return true;
+            }
+
+            var matchId = message.Event.MatchId?.Trim();
+            if (string.IsNullOrWhiteSpace(matchId))
+            {
+                await eventBus.SendToConnectionAsync(
+                    connectionId,
+                    new EventTypes.ErrorEvent(string.Empty, "matchId is required for unsubscribe-from-match."),
+                    cancellationToken);
+                return true;
+            }
+
+            eventBus.UnsubscribeFromMatch(connectionId, matchId);
+            await eventBus.SendToConnectionAsync(
+                connectionId,
+                new EventTypes.MatchUnsubscribedEvent(matchId, connectionId),
+                cancellationToken);
+            return true;
+        }
+
+        if (eventType == EventTypes.PingEvent.EventTypeName)
+        {
+            await eventBus.SendToConnectionAsync(
+                connectionId,
+                new EventTypes.PongEvent("pong"),
+                cancellationToken);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static async Task HandleGameEventAsync(
+        string connectionId,
+        string payload,
+        string eventType,
+        GameService gameService,
+        CancellationToken cancellationToken)
+    {
+        if (eventType == EventTypes.MatchStartedEvent.EventTypeName)
+        {
+            if (TryDeserialize<WebSocketMessageWrapper<EventTypes.MatchStartedEvent>>(payload, out var startedMessage) && startedMessage is not null)
+            {
+                await gameService.HandleClientMatchStartedAsync(connectionId, startedMessage.Event.MatchId, startedMessage.Event, cancellationToken);
+            }
+
+            return;
+        }
+
+        if (eventType == EventTypes.MatchEndedEvent.EventTypeName)
+        {
+            if (TryDeserialize<WebSocketMessageWrapper<EventTypes.MatchEndedEvent>>(payload, out var endedMessage) && endedMessage is not null)
+            {
+                await gameService.HandleClientMatchEndedAsync(connectionId, endedMessage.Event.MatchId, endedMessage.Event, cancellationToken);
+            }
+
+            return;
+        }
+    }
+
+    private static bool TryGetEventType(string payload, out string eventType)
+    {
+        eventType = string.Empty;
+
+        try
+        {
+            using var document = JsonDocument.Parse(payload);
+            if (!document.RootElement.TryGetProperty("event", out var eventNode) || eventNode.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            if (!eventNode.TryGetProperty("eventType", out var typeNode) || typeNode.ValueKind != JsonValueKind.String)
+            {
+                return false;
+            }
+
+            eventType = typeNode.GetString()?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(eventType))
+            {
+                return false;
+            }
+
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 
@@ -202,7 +263,7 @@ public static class GameWebSocketEndpoint
                 continue;
             }
 
-            ms.Write(buffer, 0, result.Count);
+            await ms.WriteAsync(buffer.AsMemory(0, result.Count), cancellationToken);
 
             if (result.EndOfMessage)
             {
