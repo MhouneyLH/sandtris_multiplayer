@@ -1,32 +1,64 @@
-// WebSocket message wrapper matching backend format
 export interface WebSocketMessage<T = unknown> {
-  eventType: string
   sentAt: string
+  event: T
   version: number
+}
+
+export interface BaseEvent {
+  eventType?: string
+}
+
+export interface QueueUpdatedPayload extends BaseEvent {
+  queueSize: number
+  playerId: string
+  action: 'joined' | 'left'
+}
+
+export interface MatchStartedPayload extends BaseEvent {
   matchId: string
-  data: T
+  playerIds: string[]
 }
 
-// Queue update event payload (matches C# backend PascalCase)
-export interface QueueUpdatedPayload {
-  QueueSize: number
-  PlayerId: string
-  Action: 'joined' | 'left'
+export interface MatchEndedPayload extends BaseEvent {
+  matchId: string
+  winnerPlayerId: string
 }
 
-// Match started event payload (for future use)
-export interface MatchStartedPayload {
-  MatchId: string
-  PlayerIds: string[]
+export interface SubscriptionStatePayload extends BaseEvent {
+  matchId: string
+  playerId: string
 }
 
-// Subscription confirmation payload
-export interface SubscriptionStatePayload {
-  MatchId: string
+export interface MoveInputData {
+  dataTypeName: 'move'
+  deltaX: number
+  deltaY: number
 }
 
-// Connection states
+export interface RotateInputData {
+  dataTypeName: 'rotate'
+  clockwise: boolean
+}
+
+export interface DropInputData {
+  dataTypeName: 'drop'
+}
+
+export type PlayerInputData = MoveInputData | RotateInputData | DropInputData
+
+export interface PlayerInputPayload extends BaseEvent {
+  matchId: string
+  playerId: string
+  playerInputData: PlayerInputData
+}
+
+export interface PieceSpawnedPayload extends BaseEvent {
+  matchId: string
+  playerId: string
+  shape?: number[][]
+  color?: string
+}
+
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error'
 
-// Event handler type
 export type EventHandler<T = unknown> = (data: T) => void

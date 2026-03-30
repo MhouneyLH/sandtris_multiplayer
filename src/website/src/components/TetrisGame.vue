@@ -11,15 +11,21 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { SandSimulation } from '../game/SandSimulation'
 import { TETRIS_PIECES } from '../game/TetrisPiece'
+import { useWebSocket } from '../services/websocket/useWebSocket'
+import { EVENT_TYPES } from '../services/websocket/constants'
+import type { PlayerInputPayload, PieceSpawnedPayload } from '../services/websocket/types'
 
 const props = defineProps<{
   playerId: string
+  matchId: string
   isYours: boolean
 }>()
 
 const emit = defineEmits<{
   scoreUpdate: [data: { score: number; lines: number }]
 }>()
+
+const { sendEvent, addEventListener, removeEventListener } = useWebSocket()
 
 // Canvas setup
 const VISUAL_WIDTH = 10    // Visual Tetris blocks width
@@ -48,10 +54,10 @@ const SPAWN_INTERVAL = 120 // Spawn every 120 frames (2 seconds at 60fps)
 const NEXT_BLOCK_DELAY = 5
 let activeFigureId: number | null = null
 let nextFigureId = 1
+let currentPattern: { shape: number[][]; color: string } | null = null
 
-// Debug mode: same color spawning
 let sameColorMode = false
-let lastPieceColor = '#ff0000' // Default red
+let lastPieceColor = '#ff0000'
 
 const keyState = {
   left: false,
@@ -76,29 +82,24 @@ onMounted(() => {
   ctx = gameCanvas.value.getContext('2d')
   if (!ctx) return
 
-  // Initialize sand simulation (using tetris grid dimensions)
   const onCompletion = (particlesCleared: number) => {
-    linesCleared += particlesCleared // Now represents particles cleared, not lines
-    score += particlesCleared * 10 + (particlesCleared > 10 ? Math.floor(particlesCleared / 10) * 50 : 0) // Bonus for larger groups
+    linesCleared += particlesCleared
+    score += particlesCleared * 10 + (particlesCleared > 10 ? Math.floor(particlesCleared / 10) * 50 : 0)
 
-    // Emit score update
     emit('scoreUpdate', { score, lines: linesCleared })
   }
 
   sandSimulation = new SandSimulation(GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, SAND_UPDATE_SPEED, onCompletion)
 
-  // Example: To change sand speed during gameplay:
-  // sandSimulation.setSandSpeed(1)  // Fastest (every frame)
-  // sandSimulation.setSandSpeed(3)  // Slower (every 3 frames)
-  // sandSimulation.setSandSpeed(5)  // Much slower (every 5 frames)
-
-  // Spawn first sand pattern if this is your game
   if (props.isYours) {
     spawnSandPattern()
     removeControls = setupControls()
+    sendPieceSpawned()
   }
 
-  // Start game loop
+  addEventListener<PlayerInputPayload>(EVENT_TYPES.PLAYER_INPUT, handleOpponentInput)
+  addEventListener<PieceSpawnedPayload>(EVENT_TYPES.PIECE_SPAWNED, handleOpponentPieceSpawned)
+
   gameLoop()
 })
 
@@ -139,6 +140,54 @@ const getRandomPattern = (): { shape: number[][]; color: string } => {
   return {
     shape: pieceData.shape.map((row: number[]) => [...row]),
     color: pieceData.color,
+  }
+}
+
+const sendPlayerInput = (inputData: any) => {
+  if (!props.isYours) return
+
+  sendEvent({
+    eventType: EVENT_TYPES.PLAYER_INPUT,
+    matchId: props.matchId,
+    playerId: props.playerId,
+    playerInputData: inputData,
+  })
+}
+
+const sendPieceSpawned = () => {
+  if (!props.isYours || !currentPattern) return
+
+  sendEvent({
+    eventType: EVENT_TYPES.PIECE_SPAWNED,
+    matchId: props.matchId,
+    playerId: props.playerId,
+    shape: currentPattern.shape,
+    color: currentPattern.color,
+  })
+}
+
+const handleOpponentInput = (payload: PlayerInputPayload) => {
+  if (payload.playerId !== props.playerId || props.isYours) return
+
+  const inputData = payload.playerInputData
+
+  if (activeFigureId === null) return
+
+  if (inputData.dataTypeName === 'move') {
+    sandSimulation.moveGroupByTetrisCells(activeFigureId, inputData.deltaX, inputData.deltaY, CELL_SIZE)
+  } else if (inputData.dataTypeName === 'rotate' && inputData.clockwise) {
+    sandSimulation.rotateGroupClockwise(activeFigureId)
+  } else if (inputData.dataTypeName === 'drop') {
+    while (sandSimulation.moveGroupByTetrisCells(activeFigureId, 0, 1, CELL_SIZE)) {
+    }
+  }
+}
+
+const handleOpponentPieceSpawned = (payload: PieceSpawnedPayload) => {
+  if (payload.playerId !== props.playerId || props.isYours) return
+
+  if (payload.shape && payload.color) {
+    spawnSandPattern({ shape: payload.shape, color: payload.color })
   }
 }
 
@@ -295,8 +344,10 @@ const canSpawnPatternAt = (shape: number[][], targetX: number, targetY: number):
   return true
 }
 
-const spawnSandPattern = (): boolean => {
-  const pattern = getRandomPattern()
+const spawnSandPattern = (providedPattern?: { shape: number[][]; color: string }): boolean => {
+  const pattern = providedPattern || getRandomPattern()
+  currentPattern = pattern
+
   const firstRow = pattern.shape[0] ?? []
   const spawnX = Math.floor((GRID_WIDTH - firstRow.length) / 2)
   const spawnY = 0
@@ -373,28 +424,35 @@ const update = () => {
 
     if (activeFigureId !== null) {
       if (keyState.left && now - lastLeftMove > 90) {
-        sandSimulation.moveGroupByTetrisCells(activeFigureId, -1, 0, CELL_SIZE)
+        if (sandSimulation.moveGroupByTetrisCells(activeFigureId, -1, 0, CELL_SIZE)) {
+          sendPlayerInput({ dataTypeName: 'move', deltaX: -1, deltaY: 0 })
+        }
         lastLeftMove = now
       }
 
       if (keyState.right && now - lastRightMove > 90) {
-        sandSimulation.moveGroupByTetrisCells(activeFigureId, 1, 0, CELL_SIZE)
+        if (sandSimulation.moveGroupByTetrisCells(activeFigureId, 1, 0, CELL_SIZE)) {
+          sendPlayerInput({ dataTypeName: 'move', deltaX: 1, deltaY: 0 })
+        }
         lastRightMove = now
       }
 
       if (keyState.down && now - lastDownMove > 50) {
-        sandSimulation.moveGroupByTetrisCells(activeFigureId, 0, 1, CELL_SIZE)
+        if (sandSimulation.moveGroupByTetrisCells(activeFigureId, 0, 1, CELL_SIZE)) {
+          sendPlayerInput({ dataTypeName: 'move', deltaX: 0, deltaY: 1 })
+        }
         lastDownMove = now
       }
 
       if (keyState.up && now - lastRotate > 150) {
         sandSimulation.rotateGroupClockwise(activeFigureId)
+        sendPlayerInput({ dataTypeName: 'rotate', clockwise: true })
         lastRotate = now
       }
 
       if (keyState.space) {
+        sendPlayerInput({ dataTypeName: 'drop' })
         while (sandSimulation.moveGroupByTetrisCells(activeFigureId, 0, 1, CELL_SIZE)) {
-          // Move until blocked.
         }
         keyState.space = false
       }
@@ -405,15 +463,14 @@ const update = () => {
       if (spawnTimer >= SPAWN_INTERVAL) {
         if (spawnSandPattern()) {
           spawnTimer = 0
+          sendPieceSpawned()
         } else {
-          // Spawn area blocked; retry soon without hard-stalling the loop.
           spawnTimer = SPAWN_INTERVAL - 10
         }
       }
     }
   }
 
-  // Update sand simulation
   sandSimulation.update()
 }
 
@@ -450,6 +507,9 @@ onUnmounted(() => {
     cancelAnimationFrame(animationId)
   }
   removeControls?.()
+
+  removeEventListener<PlayerInputPayload>(EVENT_TYPES.PLAYER_INPUT, handleOpponentInput)
+  removeEventListener<PieceSpawnedPayload>(EVENT_TYPES.PIECE_SPAWNED, handleOpponentPieceSpawned)
 })
 </script>
 

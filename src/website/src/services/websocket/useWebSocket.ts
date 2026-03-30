@@ -27,14 +27,13 @@ export function useWebSocket() {
 
     // Listen for queue updates
     wsClient.on<QueueUpdatedPayload>(EVENT_TYPES.QUEUE_UPDATED, (data) => {
-      const normalizedSize = Number(data.QueueSize)
+      const normalizedSize = Number(data.queueSize)
       queueSize.value = Number.isFinite(normalizedSize) ? Math.max(0, normalizedSize) : 0
-      console.log(`Queue updated: ${data.PlayerId} ${data.Action} - Size: ${queueSize.value}`)
+      console.log(`Queue updated: ${data.playerId} ${data.action} - Size: ${queueSize.value}`)
     })
 
-    // Listen for subscription confirmation
-    wsClient.on(EVENT_TYPES.SUBSCRIBED, (data) => {
-      console.log('Subscribed to:', data)
+    wsClient.on(EVENT_TYPES.MATCH_SUBSCRIBED, (data) => {
+      console.log('Subscribed to match:', data)
     })
   }
 
@@ -49,9 +48,24 @@ export function useWebSocket() {
   /**
    * Subscribe to lobby updates
    */
-  const subscribeLobby = (): void => {
+  const subscribeLobby = (playerId: string): void => {
     if (!wsClient) return
-    wsClient.subscribe(MATCH_IDS.LOBBY)
+    wsClient.subscribe(MATCH_IDS.LOBBY, playerId)
+  }
+
+  const subscribeToMatch = (matchId: string, playerId: string): void => {
+    if (!wsClient) return
+    wsClient.subscribe(matchId, playerId)
+  }
+
+  const unsubscribeFromMatch = (matchId: string, playerId: string): void => {
+    if (!wsClient) return
+    wsClient.unsubscribe(matchId, playerId)
+  }
+
+  const sendEvent = (event: object): void => {
+    if (!wsClient) return
+    wsClient.send(event)
   }
 
   /**
@@ -65,7 +79,10 @@ export function useWebSocket() {
   /**
    * Remove event listener
    */
-  const removeEventListener = <T = unknown>(eventType: string, handler: (data: T) => void): void => {
+  const removeEventListener = <T = unknown>(
+    eventType: string,
+    handler: (data: T) => void,
+  ): void => {
     if (!wsClient) return
     wsClient.off(eventType, handler)
   }
@@ -97,6 +114,9 @@ export function useWebSocket() {
     // Methods
     connect,
     subscribeLobby,
+    subscribeToMatch,
+    unsubscribeFromMatch,
+    sendEvent,
     disconnect,
     addEventListener,
     removeEventListener,

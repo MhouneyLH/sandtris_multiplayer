@@ -81,16 +81,16 @@ public static class GameWebSocketEndpoint
                 continue;
             }
 
-            if (await HandleControlEventAsync(connectionId, payload, eventType, eventBus, cancellationToken))
+            if (await HandleEventAsnyc(connectionId, payload, eventType, eventBus, cancellationToken))
             {
                 continue;
             }
 
-            await HandleGameEventAsync(connectionId, payload, eventType, gameService, cancellationToken);
+            await HandleCommandsAsync(connectionId, payload, eventType, gameService, cancellationToken);
         }
     }
 
-    private static async Task<bool> HandleControlEventAsync(
+    private static async Task<bool> HandleEventAsnyc(
         string connectionId,
         string payload,
         string eventType,
@@ -167,7 +167,7 @@ public static class GameWebSocketEndpoint
         return false;
     }
 
-    private static async Task HandleGameEventAsync(
+    private static async Task HandleCommandsAsync(
         string connectionId,
         string payload,
         string eventType,
@@ -189,6 +189,26 @@ public static class GameWebSocketEndpoint
             if (TryDeserialize<WebSocketMessageWrapper<EventTypes.MatchEndedEvent>>(payload, out var endedMessage) && endedMessage is not null)
             {
                 await gameService.HandleClientMatchEndedAsync(connectionId, endedMessage.Event.MatchId, endedMessage.Event, cancellationToken);
+            }
+
+            return;
+        }
+
+        if (eventType == EventTypes.PlayerInputEvent.EventTypeName)
+        {
+            if (TryDeserialize<WebSocketMessageWrapper<EventTypes.PlayerInputEvent>>(payload, out var inputMessage) && inputMessage is not null)
+            {
+                await gameService.BroadcastPlayerInputAsync(connectionId, inputMessage.Event.MatchId, inputMessage.Event, cancellationToken);
+            }
+
+            return;
+        }
+
+        if (eventType == EventTypes.PieceSpawnedEvent.EventTypeName)
+        {
+            if (TryDeserialize<WebSocketMessageWrapper<EventTypes.PieceSpawnedEvent>>(payload, out var spawnMessage) && spawnMessage is not null)
+            {
+                await gameService.BroadcastPieceSpawnedAsync(connectionId, spawnMessage.Event.MatchId, spawnMessage.Event, cancellationToken);
             }
 
             return;

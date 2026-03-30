@@ -50,4 +50,25 @@ public sealed class GameService(WebSocketEventBus eventBus, ILogger<GameService>
     {
         return _eventBus.PublishToMatchAsync(matchId, payload, cancellationToken);
     }
+
+    public Task BroadcastPlayerInputAsync(string connectionId, string matchId, EventTypes.PlayerInputEvent payload, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug(
+            "Broadcasting player input from {PlayerId} in match {MatchId} ({InputType}).",
+            payload.PlayerId,
+            matchId,
+            payload.PlayerInputData.GetType().Name);
+
+        return _eventBus.PublishToMatchAsync(matchId, payload, cancellationToken);
+    }
+
+    public Task BroadcastPieceSpawnedAsync(string connectionId, string matchId, EventTypes.PieceSpawnedEvent payload, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug(
+            "Broadcasting piece spawned for {PlayerId} in match {MatchId}.",
+            payload.PlayerId,
+            matchId);
+
+        return _eventBus.PublishToMatchAsync(matchId, payload, cancellationToken);
+    }
 }

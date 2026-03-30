@@ -79,8 +79,13 @@ export class WebSocketClient {
   /**
    * Send a message to the server
    */
-  send(message: object): void {
+  send(event: object): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
+      const message = {
+        sentAt: new Date().toISOString(),
+        event,
+        version: 1,
+      }
       this.ws.send(JSON.stringify(message))
     } else {
       console.warn('Cannot send message: WebSocket not connected')
@@ -90,10 +95,22 @@ export class WebSocketClient {
   /**
    * Subscribe to a match/lobby
    */
-  subscribe(matchId: string): void {
+  subscribe(matchId: string, playerId: string): void {
     this.send({
-      action: 'subscribe',
+      eventType: 'subscribe-to-match',
       matchId,
+      playerId,
+    })
+  }
+
+  /**
+   * Unsubscribe from a match/lobby
+   */
+  unsubscribe(matchId: string, playerId: string): void {
+    this.send({
+      eventType: 'unsubscribe-from-match',
+      matchId,
+      playerId,
     })
   }
 
@@ -130,13 +147,19 @@ export class WebSocketClient {
   private handleMessage(data: string): void {
     try {
       const message: WebSocketMessage = JSON.parse(data)
-      console.log('WebSocket message received:', message.eventType, message.data)
-      console.log('Raw message:', message) // DEBUG: See full message structure
+      const event = message.event as any
+      const eventType = event?.eventType
 
-      // Emit to specific event handlers
-      const handlers = this.eventHandlers.get(message.eventType)
+      if (!eventType) {
+        console.warn('Received message without eventType:', message)
+        return
+      }
+
+      console.log('WebSocket message received:', eventType, event)
+
+      const handlers = this.eventHandlers.get(eventType)
       if (handlers) {
-        handlers.forEach((handler) => handler(message.data))
+        handlers.forEach((handler) => handler(event))
       }
     } catch (error) {
       console.error('Failed to parse WebSocket message:', error)

@@ -2,11 +2,10 @@
   <div class="game-screen">
     <div class="game-screen__header">
       <h2>Match Started!</h2>
-      <p>Match ID: {{ matchData.MatchId }}</p>
+      <p>Match ID: {{ matchData.matchId }}</p>
     </div>
 
     <div class="game-screen__layout">
-      <!-- Your Game -->
       <div class="game-panel">
         <div class="game-panel__header">
           <h3>You</h3>
@@ -15,10 +14,10 @@
             <span>Particles: <strong>{{ yourLines }}</strong></span>
           </div>
         </div>
-        <TetrisGame ref="yourGame" :playerId="playerId" :isYours="true" @scoreUpdate="handleYourScoreUpdate" />
+        <TetrisGame :playerId="playerId" :matchId="matchData.matchId" :isYours="true"
+          @scoreUpdate="handleYourScoreUpdate" />
       </div>
 
-      <!-- Opponent Game -->
       <div class="game-panel">
         <div class="game-panel__header">
           <h3>Opponent</h3>
@@ -27,7 +26,7 @@
             <span>Particles: <strong>{{ opponentLines }}</strong></span>
           </div>
         </div>
-        <TetrisGame ref="opponentGame" :playerId="opponentId" :isYours="false"
+        <TetrisGame :playerId="opponentId" :matchId="matchData.matchId" :isYours="false"
           @scoreUpdate="handleOpponentScoreUpdate" />
       </div>
     </div>
@@ -35,8 +34,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import TetrisGame from './TetrisGame.vue'
+import { useWebSocket } from '../services/websocket/useWebSocket'
 import type { MatchStartedPayload } from '../services/websocket/types'
 
 const props = defineProps<{
@@ -44,18 +44,17 @@ const props = defineProps<{
   matchData: MatchStartedPayload
 }>()
 
-// Game stats
+const { subscribeToMatch, unsubscribeFromMatch } = useWebSocket()
+
 const yourScore = ref(0)
 const yourLines = ref(0)
 const opponentScore = ref(0)
 const opponentLines = ref(0)
 
-// Determine opponent ID
 const opponentId = computed(() => {
-  return props.matchData.PlayerIds.find(id => id !== props.playerId) || 'unknown'
+  return props.matchData.playerIds.find(id => id !== props.playerId) || 'unknown'
 })
 
-// Score update handlers
 const handleYourScoreUpdate = (data: { score: number; lines: number }) => {
   yourScore.value = data.score
   yourLines.value = data.lines
@@ -67,8 +66,14 @@ const handleOpponentScoreUpdate = (data: { score: number; lines: number }) => {
 }
 
 onMounted(() => {
-  console.log('Game screen mounted with players:', props.matchData.PlayerIds)
+  console.log('Game screen mounted with players:', props.matchData.playerIds)
   console.log('Your ID:', props.playerId, 'Opponent ID:', opponentId.value)
+
+  subscribeToMatch(props.matchData.matchId, props.playerId)
+})
+
+onUnmounted(() => {
+  unsubscribeFromMatch(props.matchData.matchId, props.playerId)
 })
 </script>
 

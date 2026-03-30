@@ -1,21 +1,28 @@
+using System.Text.Json.Serialization;
+
 namespace SandtrisServer.Features.Game;
 
 public interface IPlayerInputData
 {
-    public static abstract string DataTypeName { get; }
 }
 
-public sealed record MoveInputData(int DeltaX, int DeltaY) : IPlayerInputData
+public sealed record MoveInputData(
+    [property: JsonPropertyName("deltaX")] int DeltaX,
+    [property: JsonPropertyName("deltaY")] int DeltaY) : IPlayerInputData
 {
-    public static string DataTypeName => "move";
+    [JsonPropertyName("dataTypeName")]
+    public string DataTypeName => "move";
 }
 
-public sealed record RotateInputData(bool Clockwise) : IPlayerInputData
+public sealed record RotateInputData(
+    [property: JsonPropertyName("clockwise")] bool Clockwise) : IPlayerInputData
 {
-    public static string DataTypeName => "rotate";
+    [JsonPropertyName("dataTypeName")]
+    public string DataTypeName => "rotate";
 }
 
 public sealed record DropInputData : IPlayerInputData
 {
-    public static string DataTypeName => "drop";
+    [JsonPropertyName("dataTypeName")]
+    public string DataTypeName => "drop";
 }

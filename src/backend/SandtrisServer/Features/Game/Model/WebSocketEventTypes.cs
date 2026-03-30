@@ -1,88 +1,129 @@
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+
 namespace SandtrisServer.Features.Game.Model;
 
 public static class EventTypes
 {
-    /// <summary>
-    /// Indicates the start of a match. Payload includes the match ID and participating player IDs.
-    /// </summary>
-    public sealed record MatchStartedEvent(string MatchId, string[] PlayerIds) : IEvent
+    public sealed record MatchStartedEvent(
+        [property: JsonPropertyName("matchId"), Required] string MatchId,
+        [property: JsonPropertyName("playerIds"), Required] string[] PlayerIds) : IEvent
     {
         public static string EventTypeName => "match-started";
+
+        [JsonPropertyName("eventType"), Required]
+        public string EventType => EventTypeName;
     }
 
-    /// <summary>
-    /// Indicates the end of a match. Payload includes the match ID and winner player ID.
-    /// </summary>
-    public sealed record MatchEndedEvent(string MatchId, string WinnerPlayerId) : IEvent
+    public sealed record MatchEndedEvent(
+        [property: JsonPropertyName("matchId"), Required] string MatchId,
+        [property: JsonPropertyName("winnerPlayerId"), Required] string WinnerPlayerId) : IEvent
     {
         public static string EventTypeName => "match-ended";
+
+        [JsonPropertyName("eventType"), Required]
+        public string EventType => EventTypeName;
     }
 
-    /// <summary>
-    /// Indicates an update to the match queue, such as a player joining or leaving. The payload should include the current queue size and any relevant player information.
-    /// </summary>
-    public sealed record QueueUpdatedEvent(int QueueSize, string PlayerId, QueueUpdateAction Action) : IEvent
+    public sealed record QueueUpdatedEvent(
+        [property: JsonPropertyName("queueSize"), Required] int QueueSize,
+        [property: JsonPropertyName("playerId"), Required] string PlayerId,
+        [property: JsonPropertyName("action"), Required] QueueUpdateAction Action) : IEvent
     {
         public static string EventTypeName => "queue-updated";
+
+        [JsonPropertyName("eventType"), Required]
+        public string EventType => EventTypeName;
     }
 
-    /// <summary>
-    /// Client command requesting subscription to a match event stream.
-    /// </summary>
-    public sealed record SubscribeToMatchEvent(string MatchId, string PlayerId) : IEvent
+    public sealed record SubscribeToMatchEvent(
+        [property: JsonPropertyName("matchId"), Required] string MatchId,
+        [property: JsonPropertyName("playerId"), Required] string PlayerId) : IEvent
     {
         public static string EventTypeName => "subscribe-to-match";
+
+        [JsonPropertyName("eventType"), Required]
+        public string EventType => EventTypeName;
     }
 
-    /// <summary>
-    /// Client command requesting unsubscription from a match event stream.
-    /// </summary>
-    public sealed record UnsubscribeFromMatchEvent(string MatchId, string PlayerId) : IEvent
+    public sealed record UnsubscribeFromMatchEvent(
+        [property: JsonPropertyName("matchId"), Required] string MatchId,
+        [property: JsonPropertyName("playerId"), Required] string PlayerId) : IEvent
     {
         public static string EventTypeName => "unsubscribe-from-match";
+
+        [JsonPropertyName("eventType"), Required]
+        public string EventType => EventTypeName;
     }
 
-    /// <summary>
-    /// Broadcast indicating a connection/player has subscribed to a match.
-    /// </summary>
-    public sealed record MatchSubscribedEvent(string MatchId, string PlayerId) : IEvent
+    public sealed record MatchSubscribedEvent(
+        [property: JsonPropertyName("matchId"), Required] string MatchId,
+        [property: JsonPropertyName("playerId"), Required] string PlayerId) : IEvent
     {
         public static string EventTypeName => "match-subscribed";
+
+        [JsonPropertyName("eventType"), Required]
+        public string EventType => EventTypeName;
     }
 
-    /// <summary>
-    /// Broadcast indicating a connection/player has unsubscribed from a match.
-    /// </summary>
-    public sealed record MatchUnsubscribedEvent(string MatchId, string PlayerId) : IEvent
+    public sealed record MatchUnsubscribedEvent(
+        [property: JsonPropertyName("matchId"), Required] string MatchId,
+        [property: JsonPropertyName("playerId"), Required] string PlayerId) : IEvent
     {
         public static string EventTypeName => "match-unsubscribed";
+
+        [JsonPropertyName("eventType"), Required]
+        public string EventType => EventTypeName;
     }
 
-    /// <summary>
-    /// Opponent streaming event containing an input action for a player in a match.
-    /// </summary>
-    public sealed record PlayerInputEvent(string MatchId, string PlayerId, IPlayerInputData PlayerInputData) : IEvent
+    public sealed record PlayerInputEvent(
+        [property: JsonPropertyName("matchId"), Required] string MatchId,
+        [property: JsonPropertyName("playerId"), Required] string PlayerId,
+        [property: JsonPropertyName("playerInputData"), JsonConverter(typeof(PlayerInputDataConverter)), Required]
+        IPlayerInputData PlayerInputData) : IEvent
     {
         public static string EventTypeName => "player-input";
+
+        [JsonPropertyName("eventType"), Required]
+        public string EventType => EventTypeName;
     }
 
-    public sealed record PieceSpawnedEvent(string MatchId, string PlayerId) : IEvent
+    public sealed record PieceSpawnedEvent(
+        [property: JsonPropertyName("matchId"), Required] string MatchId,
+        [property: JsonPropertyName("playerId"), Required] string PlayerId,
+        [property: JsonPropertyName("shape")] int[][]? Shape,
+        [property: JsonPropertyName("color")] string? Color) : IEvent
     {
         public static string EventTypeName => "piece-spawned";
+
+        [JsonPropertyName("eventType"), Required]
+        public string EventType => EventTypeName;
     }
 
     public sealed record PingEvent : IEvent
     {
         public static string EventTypeName => "ping";
+
+        [JsonPropertyName("eventType"), Required]
+        public string EventType => EventTypeName;
     }
 
-    public sealed record PongEvent(string Message) : IEvent
+    public sealed record PongEvent(
+        [property: JsonPropertyName("message"), Required] string Message) : IEvent
     {
         public static string EventTypeName => "pong";
+
+        [JsonPropertyName("eventType"), Required]
+        public string EventType => EventTypeName;
     }
 
-    public sealed record ErrorEvent(string MatchId, string ErrorMessage) : IEvent
+    public sealed record ErrorEvent(
+        [property: JsonPropertyName("matchId"), Required] string MatchId,
+        [property: JsonPropertyName("errorMessage"), Required] string ErrorMessage) : IEvent
     {
         public static string EventTypeName => "error";
+
+        [JsonPropertyName("eventType"), Required]
+        public string EventType => EventTypeName;
     }
 }

@@ -104,12 +104,10 @@ const handleLeaveQueue = async () => {
 onMounted(async () => {
   try {
     await connect()
-    subscribeLobby()
+    subscribeLobby(playerId)
 
-    // Listen for match started events
     addEventListener<MatchStartedPayload>('match-started', handleMatchStarted)
 
-    // Fetch initial queue size after connection is established
     const initialSize = await GetQueueSize()
     if (initialSize >= 0) {
       queueSize.value = initialSize
@@ -128,21 +126,13 @@ onMounted(async () => {
 
   <!-- Queue Screen -->
   <div v-if="gameState === 'queue'">
-    <MatchQueue
-      :inQueue="inQueue"
-      :queueSize="queueSize"
-      :connectionState="connectionState"
-      @join="handleJoinQueue"
-      @leave="handleLeaveQueue"
-    />
+    <MatchQueue :inQueue="inQueue" :queueSize="queueSize" :connectionState="connectionState" @join="handleJoinQueue"
+      @leave="handleLeaveQueue" />
     <p v-if="errorMessage" role="alert">{{ errorMessage }}</p>
   </div>
 
   <!-- Game Screen -->
   <div v-else-if="gameState === 'playing' && matchData">
-    <GameScreen
-      :playerId="playerId"
-      :matchData="matchData"
-    />
+    <GameScreen :playerId="playerId" :matchData="matchData" />
   </div>
 </template>

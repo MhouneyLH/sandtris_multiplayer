@@ -1,23 +1,20 @@
-// WebSocket endpoint URL
 export const WS_URL = 'ws://localhost:5015/ws'
 
-// Event type constants (matching backend)
 export const EVENT_TYPES = {
   QUEUE_UPDATED: 'queue-updated',
   MATCH_STARTED: 'match-started',
-  SUBSCRIBED: 'subscribed',
+  MATCH_ENDED: 'match-ended',
+  MATCH_SUBSCRIBED: 'match-subscribed',
+  MATCH_UNSUBSCRIBED: 'match-unsubscribed',
+  PLAYER_INPUT: 'player-input',
+  PIECE_SPAWNED: 'piece-spawned',
+  SUBSCRIBE_TO_MATCH: 'subscribe-to-match',
+  UNSUBSCRIBE_FROM_MATCH: 'unsubscribe-from-match',
+  PING: 'ping',
   PONG: 'pong',
   ERROR: 'error',
 } as const
 
-// Control message actions
-export const ACTIONS = {
-  SUBSCRIBE: 'subscribe',
-  UNSUBSCRIBE: 'unsubscribe',
-  PING: 'ping',
-} as const
-
-// Special match IDs
 export const MATCH_IDS = {
   LOBBY: 'lobby',
 } as const
