@@ -14,7 +14,7 @@
             <span>Particles: <strong>{{ yourLines }}</strong></span>
           </div>
         </div>
-        <TetrisGame :playerId="playerId" :matchId="matchData.matchId" :isYours="true"
+        <TetrisGame :playerId="playerId" :matchId="matchData.matchId" :opponentId="opponentId" :isYours="true"
           @scoreUpdate="handleYourScoreUpdate" />
       </div>
 
@@ -26,7 +26,7 @@
             <span>Particles: <strong>{{ opponentLines }}</strong></span>
           </div>
         </div>
-        <TetrisGame :playerId="opponentId" :matchId="matchData.matchId" :isYours="false"
+        <TetrisGame :playerId="opponentId" :matchId="matchData.matchId" :opponentId="playerId" :isYours="false"
           @scoreUpdate="handleOpponentScoreUpdate" />
       </div>
     </div>

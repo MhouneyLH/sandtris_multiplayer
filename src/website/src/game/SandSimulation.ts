@@ -703,4 +703,26 @@ export class SandSimulation {
     console.log(`🔍 DEBUG: Total connected groups found: ${connectedGroups.length}`)
     return connectedGroups
   }
+
+  // Check if the game is over (particles reached the top)
+  isGameOver(tetrisCellSize: number = 30): boolean {
+    // Check if any settled particles (without a groupId) exist in the spawn area (top 2 rows)
+    // We check in tetris cell coordinates, not particle coordinates
+    const spawnRows = 2 // Top 2 tetris rows are the spawn area
+
+    const { sandHeight } = this.tetrisToSand(0, 0, tetrisCellSize)
+    const checkHeight = spawnRows * sandHeight
+
+    for (let y = 0; y < checkHeight && y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        const particle = this.getParticle(x, y)
+        // Only check settled particles (no groupId means the piece has been released)
+        if (particle && particle.groupId === undefined) {
+          return true
+        }
+      }
+    }
+
+    return false
+  }
 }

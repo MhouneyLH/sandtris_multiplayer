@@ -2,6 +2,15 @@
   <div class="tetris-game">
     <canvas ref="gameCanvas" :width="CANVAS_WIDTH" :height="CANVAS_HEIGHT"
       :class="['tetris-game__canvas', { 'tetris-game__canvas--yours': isYours }]" />
+
+    <div v-if="isGameOver" class="tetris-game__game-over-overlay">
+      <div class="tetris-game__game-over-content">
+        <h2 v-if="gameOverWinner === playerId" class="tetris-game__game-over-title--win">🏆 Victory!</h2>
+        <h2 v-else class="tetris-game__game-over-title--lose">Game Over</h2>
+        <p v-if="gameOverWinner === playerId" class="tetris-game__game-over-message">You won the match!</p>
+        <p v-else class="tetris-game__game-over-message">Your opponent won</p>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -11,12 +20,13 @@ import { SandSimulation } from '../game/SandSimulation'
 import { TETRIS_PIECES } from '../game/TetrisPiece'
 import { useWebSocket } from '../services/websocket/useWebSocket'
 import { EVENT_TYPES } from '../services/websocket/constants'
-import type { PlayerInputPayload, PieceSpawnedPayload } from '../services/websocket/types'
+import type { PlayerInputPayload, PieceSpawnedPayload, MatchEndedPayload } from '../services/websocket/types'
 
 const props = defineProps<{
   playerId: string
   matchId: string
   isYours: boolean
+  opponentId: string
 }>()
 
 const emit = defineEmits<{
@@ -57,6 +67,10 @@ let currentPattern: { shape: number[][]; color: string } | null = null
 let sameColorMode = false
 let lastPieceColor = '#ff0000'
 
+// Game over state
+const isGameOver = ref(false)
+const gameOverWinner = ref<string | null>(null)
+
 const keyState = {
   left: false,
   right: false,
@@ -92,6 +106,7 @@ onMounted(() => {
   // Add event listeners FIRST before any events are sent
   addEventListener<PlayerInputPayload>(EVENT_TYPES.PLAYER_INPUT, handleOpponentInput)
   addEventListener<PieceSpawnedPayload>(EVENT_TYPES.PIECE_SPAWNED, handleOpponentPieceSpawned)
+  addEventListener<MatchEndedPayload>(EVENT_TYPES.MATCH_ENDED, handleMatchEnded)
 
   if (props.isYours) {
     removeControls = setupControls()
@@ -168,6 +183,18 @@ const sendPieceSpawned = () => {
   })
 }
 
+const sendGameOver = (winnerId: string) => {
+  if (!props.isYours) return
+
+  console.log(`🏁 Game Over! Winner: ${winnerId}`)
+
+  sendEvent({
+    eventType: EVENT_TYPES.MATCH_ENDED,
+    matchId: props.matchId,
+    winnerPlayerId: winnerId,
+  })
+}
+
 const handleOpponentInput = (payload: PlayerInputPayload) => {
   if (payload.playerId !== props.playerId || props.isYours) return
 
@@ -190,6 +217,21 @@ const handleOpponentPieceSpawned = (payload: PieceSpawnedPayload) => {
 
   if (payload.shape && payload.color) {
     spawnSandPattern({ shape: payload.shape, color: payload.color })
+  }
+}
+
+const handleMatchEnded = (payload: MatchEndedPayload) => {
+  if (payload.matchId !== props.matchId) return
+
+  console.log(`🏁 Received Match Ended event. Winner: ${payload.winnerPlayerId}`)
+
+  isGameOver.value = true
+  gameOverWinner.value = payload.winnerPlayerId
+
+  // Stop the game loop
+  if (animationId) {
+    cancelAnimationFrame(animationId)
+    animationId = null
   }
 }
 
@@ -409,6 +451,9 @@ const gameLoop = () => {
 }
 
 const update = () => {
+  // Stop updating if game is over
+  if (isGameOver.value) return
+
   if (props.isYours) {
     const now = Date.now()
 
@@ -421,6 +466,21 @@ const update = () => {
         sandSimulation.releaseGroup(activeFigureId)
         activeFigureId = null
         spawnTimer = Math.max(0, SPAWN_INTERVAL - NEXT_BLOCK_DELAY)
+
+        // Check for game over immediately after releasing the piece
+        if (sandSimulation.isGameOver(CELL_SIZE)) {
+          console.log('🏁 Game Over! Particles reached the top after piece settled.')
+
+          // Send game over event - opponent wins because we lost
+          sendGameOver(props.opponentId)
+
+          // Set local game over state
+          isGameOver.value = true
+          gameOverWinner.value = props.opponentId
+
+          // The animation will stop on next frame due to isGameOver check
+          return
+        }
       }
     }
 
@@ -463,11 +523,38 @@ const update = () => {
     if (activeFigureId === null) {
       spawnTimer += 1
       if (spawnTimer >= SPAWN_INTERVAL) {
+        // Check if game is over before trying to spawn
+        if (sandSimulation.isGameOver(CELL_SIZE)) {
+          // Game Over - particles reached the top
+          console.log('🏁 Game Over! Particles reached the top.')
+
+          // Send game over event - opponent wins because we lost
+          sendGameOver(props.opponentId)
+
+          // Set local game over state
+          isGameOver.value = true
+          gameOverWinner.value = props.opponentId
+
+          // The animation will stop on next frame due to isGameOver check
+          return
+        }
+
         if (spawnSandPattern()) {
           spawnTimer = 0
           sendPieceSpawned()
         } else {
-          spawnTimer = SPAWN_INTERVAL - 10
+          // Game Over - couldn't spawn new piece
+          console.log('🏁 Game Over! Could not spawn new piece at the top.')
+
+          // Send game over event - opponent wins because we lost
+          sendGameOver(props.opponentId)
+
+          // Set local game over state
+          isGameOver.value = true
+          gameOverWinner.value = props.opponentId
+
+          // The animation will stop on next frame due to isGameOver check
+          return
         }
       }
     }
@@ -512,6 +599,7 @@ onUnmounted(() => {
 
   removeEventListener<PlayerInputPayload>(EVENT_TYPES.PLAYER_INPUT, handleOpponentInput)
   removeEventListener<PieceSpawnedPayload>(EVENT_TYPES.PIECE_SPAWNED, handleOpponentPieceSpawned)
+  removeEventListener<MatchEndedPayload>(EVENT_TYPES.MATCH_ENDED, handleMatchEnded)
 })
 </script>
 
@@ -532,5 +620,58 @@ onUnmounted(() => {
   border-color: #10b981;
   box-shadow: 0 0 15px rgba(16, 185, 129, 0.5),
     0 0 30px rgba(16, 185, 129, 0.3);
+}
+
+.tetris-game__game-over-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+}
+
+.tetris-game__game-over-content {
+  text-align: center;
+  padding: 2rem;
+}
+
+.tetris-game__game-over-title--win {
+  color: #10b981;
+  font-size: 2.5rem;
+  margin: 0 0 0.5rem 0;
+  text-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.tetris-game__game-over-title--lose {
+  color: #ef4444;
+  font-size: 2rem;
+  margin: 0 0 0.5rem 0;
+  text-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+}
+
+.tetris-game__game-over-message {
+  color: #e5e7eb;
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
 }
 </style>
