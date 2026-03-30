@@ -1,4 +1,4 @@
-const API_BASE_URL: string = 'http://localhost:5015'
+const API_BASE_URL: string = import.meta.env.VITE_BACKEND_BASE_URL || 'http://localhost:5015'
 
 export async function GetQueueSize(): Promise<number> {
   try {

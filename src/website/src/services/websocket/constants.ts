@@ -1,4 +1,4 @@
-export const WS_URL = 'ws://localhost:5015/ws'
+export const WS_URL = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:5015/ws'
 
 export const EVENT_TYPES = {
   QUEUE_UPDATED: 'queue-updated',

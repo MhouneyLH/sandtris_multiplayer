@@ -2,21 +2,22 @@ services:
   website:
     build:
       context: ./src/website
-    network:
+    networks:
       - sandtris-network
     ports:
-      - "3000:3000"
+      - "6000:8080"
     environment:
       - NODE_ENV=development
+      - VITE_BACKEND_BASE_URL=http://server:8080
+      - VITE_WEBSOCKET_URL=ws://server:8080/ws
+    
   server:
     build:
       context: ./src/backend/SandtrisServer
-    network:
+    networks:
       - sandtris-network
-    ports:
-      - "4000:4000"
-    environment:
-      - NODE_ENV=development
+    expose:
+      - "8080"
 
 networks:
   sandtris-network:
