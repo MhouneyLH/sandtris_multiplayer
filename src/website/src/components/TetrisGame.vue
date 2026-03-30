@@ -1,9 +1,7 @@
 <template>
   <div class="tetris-game">
-    <canvas ref="gameCanvas" :width="CANVAS_WIDTH" :height="CANVAS_HEIGHT" class="tetris-game__canvas" />
-    <div v-if="!isYours" class="tetris-game__overlay">
-      <span>Opponent's View</span>
-    </div>
+    <canvas ref="gameCanvas" :width="CANVAS_WIDTH" :height="CANVAS_HEIGHT"
+      :class="['tetris-game__canvas', { 'tetris-game__canvas--yours': isYours }]" />
   </div>
 </template>
 
@@ -91,14 +89,18 @@ onMounted(() => {
 
   sandSimulation = new SandSimulation(GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, SAND_UPDATE_SPEED, onCompletion)
 
-  if (props.isYours) {
-    spawnSandPattern()
-    removeControls = setupControls()
-    sendPieceSpawned()
-  }
-
+  // Add event listeners FIRST before any events are sent
   addEventListener<PlayerInputPayload>(EVENT_TYPES.PLAYER_INPUT, handleOpponentInput)
   addEventListener<PieceSpawnedPayload>(EVENT_TYPES.PIECE_SPAWNED, handleOpponentPieceSpawned)
+
+  if (props.isYours) {
+    removeControls = setupControls()
+    // Use setTimeout to ensure opponent view is mounted and listening
+    setTimeout(() => {
+      spawnSandPattern()
+      sendPieceSpawned()
+    }, 50)
+  }
 
   gameLoop()
 })
@@ -526,19 +528,9 @@ onUnmounted(() => {
   display: block;
 }
 
-.tetris-game__overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: bold;
-  font-size: 1.2rem;
-  border-radius: 8px;
+.tetris-game__canvas--yours {
+  border-color: #10b981;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.5),
+    0 0 30px rgba(16, 185, 129, 0.3);
 }
 </style>

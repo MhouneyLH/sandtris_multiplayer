@@ -1,4 +1,3 @@
-- streaming so that we can see opponents moves near real time
 - removing queue for:
   - quick match button that utilizes the queue we already have
   - Create Party with configuration like (party size -> maxSize = 4; code will be generated and sharable with friends)
