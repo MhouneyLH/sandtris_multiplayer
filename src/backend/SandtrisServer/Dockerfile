@@ -23,11 +23,11 @@ COPY --from=build /app/publish .
 
 USER app
 
-ENV ASPNETCORE_URLS=http://+:8080 \
+ENV ASPNETCORE_URLS=http://+:5015 \
     ASPNETCORE_ENVIRONMENT=Development \
     DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true
 
-EXPOSE 8080
+EXPOSE 5015
 
 ENTRYPOINT ["dotnet", "SandtrisServer.dll"]

@@ -31,5 +31,5 @@ EXPOSE 8080
 
 # Start the static file server
 # -s flag enables SPA mode (fallback to index.html)
-# -l 8080 sets the port
-CMD ["serve", "-s", "dist", "-l", "8080"]
+# -l tcp://0.0.0.0:8080 binds to all interfaces on port 8080
+CMD ["serve", "-s", "dist", "-l", "tcp://0.0.0.0:8080"]

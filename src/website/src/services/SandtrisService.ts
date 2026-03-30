@@ -1,4 +1,9 @@
-const API_BASE_URL: string = import.meta.env.VITE_BACKEND_BASE_URL || 'http://localhost:5015'
+const _apiBaseUrl = import.meta.env.VITE_BACKEND_BASE_URL;
+if (!_apiBaseUrl) {
+  throw new Error('[FATAL] VITE_BACKEND_BASE_URL is not set! Please check your environment configuration.');
+}
+export const API_BASE_URL: string = _apiBaseUrl;
+console.log('[DEBUG] VITE_BACKEND_BASE_URL:', import.meta.env.VITE_BACKEND_BASE_URL, '| API_BASE_URL:', API_BASE_URL);
 
 export async function GetQueueSize(): Promise<number> {
   try {
