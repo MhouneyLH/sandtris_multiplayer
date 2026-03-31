@@ -1,4 +1,4 @@
-FROM node:22-bookworm AS builder
+FROM node:25-bookworm AS builder
 
 WORKDIR /app
 
@@ -12,8 +12,8 @@ COPY . .
 
 RUN pnpm run build
 
-
-FROM node:22-bookworm-slim AS production
+ 
+FROM node:25-bookworm-slim AS production
 
 WORKDIR /app
 
