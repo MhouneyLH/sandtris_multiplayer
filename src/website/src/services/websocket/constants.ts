@@ -1,9 +1,11 @@
-const _wsUrl = import.meta.env.VITE_WEBSOCKET_URL;
+const _wsUrl = import.meta.env.VITE_WEBSOCKET_URL
 if (!_wsUrl) {
-  throw new Error('[FATAL] VITE_WEBSOCKET_URL is not set! Please check your environment configuration.');
+  throw new Error(
+    '[FATAL] VITE_WEBSOCKET_URL is not set! Please check your environment configuration.',
+  )
 }
-export const WS_URL: string = _wsUrl;
-console.log('[DEBUG] VITE_WEBSOCKET_URL:', import.meta.env.VITE_WEBSOCKET_URL, '| WS_URL:', WS_URL);
+export const WS_URL: string = _wsUrl
+console.log('[DEBUG] VITE_WEBSOCKET_URL:', import.meta.env.VITE_WEBSOCKET_URL, '| WS_URL:', WS_URL)
 
 export const EVENT_TYPES = {
   QUEUE_UPDATED: 'queue-updated',
