@@ -1,4 +1,4 @@
-name: CI: Frontend
+name: CI (Frontend)
 
 on:
   push:
@@ -19,7 +19,7 @@ env:
 
 jobs:
   build-and-test-website:
-    name: Build & Test Website  
+    name: Build & Test Website
     runs-on: ubuntu-latest
 
     steps:
