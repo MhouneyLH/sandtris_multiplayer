@@ -1,7 +1,7 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { WebSocketClient } from './WebSocketClient'
 import { WS_URL, EVENT_TYPES, MATCH_IDS } from './constants'
-import type { ConnectionState, QueueUpdatedPayload, MatchStartedPayload } from './types'
+import type { ConnectionState, QueueUpdatedPayload } from './types'
 
 // Singleton instance (shared across components)
 let wsClient: WebSocketClient | null = null

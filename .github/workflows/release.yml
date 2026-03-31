@@ -1,4 +1,4 @@
-name: Create new Release Release (Build, Push & Deploy)
+name: Create new Release (Build, Push & Deploy)
 
 on:
   push:
