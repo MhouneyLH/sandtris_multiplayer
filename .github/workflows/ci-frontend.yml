@@ -14,7 +14,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  WEBSITE_IMAGE_NAME: sandtris-multiplayer/website
+  WEBSITE_IMAGE_NAME: mhouneylh/sandtris-multiplayer/website
   WEBSITE_WORKING_DIRECTORY: ./src/frontend/website
 
 jobs:

@@ -7,8 +7,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  SANDTRIS_SERVER_IMAGE_NAME: sandtris-multiplayer/sandtris_server
-  WEBSITE_IMAGE_NAME: sandtris-multiplayer/website
+  SANDTRIS_SERVER_IMAGE_NAME: mhouneylh/sandtris-multiplayer/sandtris_server
+  WEBSITE_IMAGE_NAME: mhouneylh/sandtris-multiplayer/website
   WEBSITE_WORKING_DIRECTORY: ./src/frontend/website
 
 jobs:
