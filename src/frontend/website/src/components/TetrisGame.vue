@@ -20,7 +20,7 @@ import { SandSimulation } from '../game/SandSimulation'
 import { TETRIS_PIECES } from '../game/TetrisPiece'
 import { useWebSocket } from '../services/websocket/useWebSocket'
 import { EVENT_TYPES } from '../services/websocket/constants'
-import type { PlayerInputPayload, PieceSpawnedPayload, MatchEndedPayload } from '../services/websocket/types'
+import type { PlayerInputPayload, PieceSpawnedPayload, MatchEndedPayload, PlayerInputData } from '../services/websocket/types'
 
 const props = defineProps<{
   playerId: string
@@ -160,7 +160,7 @@ const getRandomPattern = (): { shape: number[][]; color: string } => {
   }
 }
 
-const sendPlayerInput = (inputData: any) => {
+const sendPlayerInput = (inputData: PlayerInputData) => {
   if (!props.isYours) return
 
   sendEvent({
@@ -431,9 +431,9 @@ const spawnSandPattern = (providedPattern?: { shape: number[][]; color: string }
 const varyColor = (color: string, variation: number): string => {
   // Parse hex color
   const hex = color.replace('#', '')
-  const r = parseInt(hex.substr(0, 2), 16)
-  const g = parseInt(hex.substr(2, 2), 16)
-  const b = parseInt(hex.substr(4, 2), 16)
+  const r = Number.parseInt(hex.substr(0, 2), 16)
+  const g = Number.parseInt(hex.substr(2, 2), 16)
+  const b = Number.parseInt(hex.substr(4, 2), 16)
 
   // Apply variation
   const newR = Math.max(0, Math.min(255, Math.round(r * (1 + variation))))
@@ -663,6 +663,7 @@ onUnmounted(() => {
 }
 
 @keyframes pulse {
+
   0%,
   100% {
     transform: scale(1);

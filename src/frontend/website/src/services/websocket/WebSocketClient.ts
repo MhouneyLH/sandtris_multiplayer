@@ -2,8 +2,8 @@ import type { WebSocketMessage, EventHandler, ConnectionState } from './types'
 
 export class WebSocketClient {
   private ws: WebSocket | null = null
-  private url: string
-  private eventHandlers: Map<string, Set<EventHandler>> = new Map()
+  private readonly url: string
+  private readonly eventHandlers: Map<string, Set<EventHandler>> = new Map()
   private state: ConnectionState = 'disconnected'
 
   constructor(url: string) {
@@ -147,8 +147,12 @@ export class WebSocketClient {
   private handleMessage(data: string): void {
     try {
       const message: WebSocketMessage = JSON.parse(data)
-      const event = message.event as any
-      const eventType = event?.eventType
+      const event = message.event as unknown
+      // Type guard for eventType
+      let eventType: string | undefined = undefined
+      if (typeof event === 'object' && event !== null && 'eventType' in event) {
+        eventType = (event as { eventType?: string }).eventType
+      }
 
       if (!eventType) {
         console.warn('Received message without eventType:', message)
