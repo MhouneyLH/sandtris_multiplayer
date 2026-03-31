@@ -35,8 +35,18 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "25"
-          cache: "pnpm"
-          cache-dependency-path: ${{ env.WEBSITE_WORKING_DIRECTORY }}/pnpm-lock.json
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm dependencies
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('${{ env.WEBSITE_WORKING_DIRECTORY }}/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
 
       - name: Install dependencies
         working-directory: ${{ env.WEBSITE_WORKING_DIRECTORY }}
