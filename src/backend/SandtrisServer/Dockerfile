@@ -10,7 +10,6 @@ COPY . .
 RUN dotnet publish SandtrisServer.csproj \
     -c Release \
     -o /app/publish \
-    /p:PublishTrimmed=true \
     /p:PublishReadyToRun=true \
     /p:InvariantGlobalization=true
 
