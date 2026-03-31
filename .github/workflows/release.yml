@@ -37,7 +37,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ SANDTRIS_SERVER_IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.SANDTRIS_SERVER_IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}        # e.g. 1.2.3
             type=semver,pattern={{major}}.{{minor}} # e.g. 1.2

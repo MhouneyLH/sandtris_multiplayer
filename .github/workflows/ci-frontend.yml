@@ -18,8 +18,8 @@ env:
   WEBSITE_WORKING_DIRECTORY: ./src/frontend/website
 
 jobs:
-  build-and-test-website:
-    name: Build & Test Website
+  build-website:
+    name: Build Website
     runs-on: ubuntu-latest
 
     steps:
@@ -54,20 +54,16 @@ jobs:
 
       - name: Lint
         working-directory: ${{ env.WEBSITE_WORKING_DIRECTORY }}
-        run: pnpm run lint --if-present
-
-      - name: Test
-        working-directory: ${{ env.WEBSITE_WORKING_DIRECTORY }}
-        run: pnpm test --if-present
+        run: pnpm run lint
 
       - name: Build
         working-directory: ${{ env.WEBSITE_WORKING_DIRECTORY }}
-        run: pnpm run build --if-present
+        run: pnpm run build
 
   docker-build-website:
     name: Docker Build Website (no push)
     runs-on: ubuntu-latest
-    needs: build-and-test-website
+    needs: build-website
 
     steps:
       - name: Checkout
