@@ -143,10 +143,10 @@ jobs:
 
             **Sandtris Server:**
             ```
-            docker pull ${{ REGISTRY }}/${{ SANDTRIS_SERVER_IMAGE_NAME }}:${{ github.ref_name }}
+            docker pull ${{ env.REGISTRY }}/${{ env.SANDTRIS_SERVER_IMAGE_NAME }}:${{ github.ref_name }}
             ```
 
             **Website:**
             ```
-            docker pull ${{ REGISTRY }}/${{ WEBSITE_IMAGE_NAME }}:${{ github.ref_name }}
+            docker pull ${{ env.REGISTRY }}/${{ env.WEBSITE_IMAGE_NAME }}:${{ github.ref_name }}
             ```
