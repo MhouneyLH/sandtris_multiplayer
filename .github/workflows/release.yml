@@ -7,6 +7,9 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  SANDTRIS_SERVER_IMAGE_NAME: sandtris-multiplayer/sandtris_server
+  WEBSITE_IMAGE_NAME: sandtris-multiplayer/website
+  WEBSITE_WORKING_DIRECTORY: ./src/frontend/website
 
 jobs:
   release-sandtris-server:
@@ -34,7 +37,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/sandtris-server
+          images: ${{ env.REGISTRY }}/${{ SANDTRIS_SERVER_IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}        # e.g. 1.2.3
             type=semver,pattern={{major}}.{{minor}} # e.g. 1.2
@@ -79,7 +82,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/website
+          images: ${{ env.REGISTRY }}/${{ env.WEBSITE_IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -140,10 +143,10 @@ jobs:
 
             **Sandtris Server:**
             ```
-            docker pull ghcr.io/${{ github.repository }}/sandtris-server:${{ github.ref_name }}
+            docker pull ghcr.io/${{ SANDTRIS_SERVER_IMAGE_NAME }}:${{ github.ref_name }}
             ```
 
             **Website:**
             ```
-            docker pull ghcr.io/${{ github.repository }}/website:${{ github.ref_name }}
+            docker pull ghcr.io/${{ WEBSITE_IMAGE_NAME }}:${{ github.ref_name }}
             ```

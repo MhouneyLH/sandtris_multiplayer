@@ -14,7 +14,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  SANDTRIS_SERVER_IMAGE_NAME: ${{ github.repository }}/sandtris-server
+  SANDTRIS_SERVER_IMAGE_NAME: sandtris-multiplayer/sandtris-server
   WORKING_DIRECTORY: ./src/backend/SandtrisServer
 
 jobs:
