@@ -4,6 +4,13 @@ WORKDIR /app
 
 RUN npm install -g pnpm
 
+# Accept build-time environment variables for Vite
+ARG VITE_BACKEND_BASE_URL
+ARG VITE_WEBSOCKET_URL
+
+ENV VITE_BACKEND_BASE_URL=$VITE_BACKEND_BASE_URL
+ENV VITE_WEBSOCKET_URL=$VITE_WEBSOCKET_URL
+
 COPY package.json pnpm-lock.yaml ./
 
 RUN pnpm install --frozen-lockfile
